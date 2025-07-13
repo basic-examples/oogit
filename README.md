@@ -12,7 +12,7 @@ A CLI tool for managing OOXML (Word, Excel, PowerPoint) files in Git repositorie
 
 ```sh
 # Clone the repository and make the script executable
-git clone https://github.com/oogit/oogit.git
+git clone https://github.com/basic-examples/oogit.git
 chmod +x oogit/oogit.sh
 cp oogit/oogit.sh /usr/local/bin/oogit
 ```
