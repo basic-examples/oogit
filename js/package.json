@@ -1,0 +1,23 @@
+{
+  "name": "oogit",
+  "type": "module",
+  "version": "0.0.1",
+  "description": "oogit is a CLI tool to version control OOXML files",
+  "bin": {
+    "oogit": "bin.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/basic-examples/oogit.git"
+  },
+  "scripts": {
+    "build": "rimraf dist && mkdirp dist && cpy --flat ../README.md ../oogit.sh src/bin.js dist && package-json-minifier",
+    "publish": "npm run build && cd dist && npm publish"
+  },
+  "devDependencies": {
+    "cpy-cli": "^5.0.0",
+    "mkdirp": "^3.0.1",
+    "package.json-minifier": "^0.0.4",
+    "rimraf": "^6.0.1"
+  }
+}

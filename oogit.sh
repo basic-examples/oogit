@@ -2,6 +2,11 @@
 
 set -euo pipefail
 
+NAME=$0
+if [[ -n "${NAME_OVERRIDE:-}" ]]; then
+  NAME="$NAME_OVERRIDE"
+fi
+
 if ! command -v git >/dev/null 2>&1; then
   echo "[oogit] git not found" >&2
   exit 1
@@ -436,7 +441,7 @@ commit_command() {
   init_command "${init_args[@]}"
 }
 
-udpate_command() {
+update_command() {
   local ooxml_file=""
 
   local force=false
@@ -645,7 +650,7 @@ EOF
 }
 
 version_command() {
-  echo "oogit 0.0.0-dev"
+  echo "oogit 0.0.1"
 }
 
 help_command() {
@@ -654,7 +659,7 @@ help_command() {
   version_command
 
   cat <<EOF
-Usage: $0 {help|init|checkout|commit|update|reset} ...
+Usage: $NAME_OVERRIDE {help|init|checkout|commit|update|reset} ...
 
 Commands:
   help
@@ -681,19 +686,19 @@ Environment Variables:
 
 Examples:
   # initial commit on your machine (it will generate report.pptx.oogit file as well)
-  $0 init report.pptx https://github.com/example/repo.git documents/report
+  $NAME_OVERRIDE init report.pptx https://github.com/example/repo.git documents/report
   # init with custom commit message
-  $0 init -m "Initial commit" report.pptx https://github.com/example/repo.git documents/report
+  $NAME_OVERRIDE init -m "Initial commit" report.pptx https://github.com/example/repo.git documents/report
   # init with filename starting with dash (use -- separator)
-  $0 init -m "Initial commit" -- -filename-starts-with-dash.pptx https://github.com/example/repo.git
+  $NAME_OVERRIDE init -m "Initial commit" -- -filename-starts-with-dash.pptx https://github.com/example/repo.git
   # checkout/clone/pull (it will generate report.pptx.oogit file as well)
-  $0 checkout report.pptx https://github.com/example/repo.git documents/report
+  $NAME_OVERRIDE checkout report.pptx https://github.com/example/repo.git documents/report
   # usual commit - requires report.pptx.oogit file
-  $0 commit report.pptx
+  $NAME_OVERRIDE commit report.pptx
   # usual update - requires report.pptx.oogit file, conflicts will not be resolved
-  $0 update report.pptx
+  $NAME_OVERRIDE update report.pptx
   # reset when you want to revert to the original state
-  $0 reset report.pptx
+  $NAME_OVERRIDE reset report.pptx
 EOF
 
   exit "$exit_code"
