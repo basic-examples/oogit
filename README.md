@@ -10,11 +10,17 @@ A CLI tool for managing OOXML (Word, Excel, PowerPoint) files in Git repositorie
 
 ## Installation
 
-```bash
+```sh
 # Clone the repository and make the script executable
 git clone https://github.com/oogit/oogit.git
 chmod +x oogit/oogit.sh
 cp oogit/oogit.sh /usr/local/bin/oogit
+```
+
+or
+
+```sh
+npm install -g oogit
 ```
 
 ## Usage
