@@ -1,0 +1,42 @@
+{
+  "name": "oogit",
+  "version": "0.1.0",
+  "description": "A CLI tool for managing OOXML (Word, Excel, PowerPoint) files in Git repositories.",
+  "main": "index.js",
+  "scripts": {
+    "generate": "typia generate --input src/templates --output src/generated --project tsconfig.json",
+    "build": "rimraf dist && node esbuild.config.js && package-json-minifier && cpy README.md dist",
+    "publish": "npm run build && cd dist && npm publish"
+  },
+  "bin": {
+    "oogit": "./bin.js"
+  },
+  "keywords": [
+    "ooxml"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/basic-examples/oogit.git"
+  },
+  "author": "Juyeong Maing <mjy9088@naver.com>",
+  "license": "MIT",
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "commander": "^14.0.0",
+    "es-git": "^0.4.0"
+  },
+  "devDependencies": {
+    "@ryoppippi/unplugin-typia": "^2.6.5",
+    "@types/adm-zip": "^0.5.7",
+    "@types/node": "^24.0.13",
+    "clean-empty-directory": "^2.0.0",
+    "clean-empty-js": "^2.0.1",
+    "cpy-cli": "^5.0.0",
+    "esbuild": "^0.25.6",
+    "package.json-minifier": "^0.0.4",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "typia": "^9.5.0"
+  }
+}
