@@ -184,7 +184,8 @@ init_command() {
       echo "[oogit] Branch '$branch' not found, creating new branch"
       my_git clone --single-branch --depth 1 -- "$repo_url" "$TEMP_DIR/repo"
       my_pushd "$TEMP_DIR/repo"
-      my_git checkout -b "$branch"
+      my_git checkout --orphan "$branch"
+      my_git reset --hard
       my_popd
     fi
   else
