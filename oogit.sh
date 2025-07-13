@@ -659,7 +659,7 @@ help_command() {
   version_command
 
   cat <<EOF
-Usage: $NAME_OVERRIDE {help|init|checkout|commit|update|reset} ...
+Usage: $NAME {help|init|checkout|commit|update|reset} ...
 
 Commands:
   help
@@ -686,19 +686,19 @@ Environment Variables:
 
 Examples:
   # initial commit on your machine (it will generate report.pptx.oogit file as well)
-  $NAME_OVERRIDE init report.pptx https://github.com/example/repo.git documents/report
+  $NAME init report.pptx https://github.com/example/repo.git documents/report
   # init with custom commit message
-  $NAME_OVERRIDE init -m "Initial commit" report.pptx https://github.com/example/repo.git documents/report
+  $NAME init -m "Initial commit" report.pptx https://github.com/example/repo.git documents/report
   # init with filename starting with dash (use -- separator)
-  $NAME_OVERRIDE init -m "Initial commit" -- -filename-starts-with-dash.pptx https://github.com/example/repo.git
+  $NAME init -m "Initial commit" -- -filename-starts-with-dash.pptx https://github.com/example/repo.git
   # checkout/clone/pull (it will generate report.pptx.oogit file as well)
-  $NAME_OVERRIDE checkout report.pptx https://github.com/example/repo.git documents/report
+  $NAME checkout report.pptx https://github.com/example/repo.git documents/report
   # usual commit - requires report.pptx.oogit file
-  $NAME_OVERRIDE commit report.pptx
+  $NAME commit report.pptx
   # usual update - requires report.pptx.oogit file, conflicts will not be resolved
-  $NAME_OVERRIDE update report.pptx
+  $NAME update report.pptx
   # reset when you want to revert to the original state
-  $NAME_OVERRIDE reset report.pptx
+  $NAME reset report.pptx
 EOF
 
   exit "$exit_code"
