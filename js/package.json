@@ -1,7 +1,7 @@
 {
   "name": "oogit",
   "type": "module",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "oogit is a CLI tool to version control OOXML files",
   "bin": {
     "oogit": "bin.js"

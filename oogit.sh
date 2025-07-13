@@ -650,7 +650,7 @@ EOF
 }
 
 version_command() {
-  echo "oogit 0.0.1"
+  echo "oogit 0.0.2"
 }
 
 help_command() {
