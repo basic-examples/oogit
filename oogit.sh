@@ -195,7 +195,9 @@ init_command() {
   fi
 
   if [[ -n "$expected_commit_hash" ]]; then
+    my_pushd "$TEMP_DIR/repo"
     local current_commit_hash=$(git rev-parse HEAD)
+    my_popd
     if [[ "$current_commit_hash" != "$expected_commit_hash" ]]; then
       echo "[oogit] Error: Commit hash mismatch" >&2
       exit 1
@@ -336,7 +338,7 @@ checkout_command() {
 1
 $repo_url
 $path_in_repo
-${branch_or_commit:-main}
+${branch_or_commit}
 $commit_hash
 EOF
 }
@@ -428,7 +430,7 @@ commit_command() {
     init_args+=("-c" "$commit_hash")
   fi
 
-  init_args+=("--" "$ooxml_file" "$repo_url" "$branch" "$path_in_repo")
+  init_args+=("--force" "--" "$ooxml_file" "$repo_url" "$branch" "$path_in_repo")
 
   init_command "${init_args[@]}"
 }
