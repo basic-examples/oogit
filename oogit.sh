@@ -58,20 +58,6 @@ convert_path_windows() {
   fi
 }
 
-rm_except_for_dot_git() {
-  local dir="$1"
-
-  my_pushd "$dir"
-  for f in ./* ./.*
-  do
-    case "$f" in
-      .|..|.git|./.git) continue ;;
-      *) rm -rf -- "$f" ;;
-    esac
-  done
-  my_popd
-}
-
 zip_dir() {
   local src_dir="$1"
   local out_file="$2"
@@ -103,7 +89,7 @@ unzip_file() {
 init_command() {
   local ooxml_file=""
   local repo_url=""
-  local path_in_repo="/"
+  local path_in_repo="/root"
   local branch=""
 
   local commit_message=""
@@ -179,6 +165,10 @@ init_command() {
   if [[ "${path_in_repo:0:1}" != "/" ]]; then
     path_in_repo="/$path_in_repo"
   fi
+  if [[ "$path_in_repo" == "/" ]]; then
+    echo "[oogit] Error: path_in_repo cannot be /" >&2
+    exit 1
+  fi
 
   local meta_file="${ooxml_file}.oogit"
 
@@ -212,11 +202,7 @@ init_command() {
     fi
   fi
 
-  if [[ "$path_in_repo" = "/" ]]; then
-    rm_except_for_dot_git "$TEMP_DIR/repo"
-  else
-    rm -rf "$TEMP_DIR/repo$path_in_repo"
-  fi
+  rm -rf "$TEMP_DIR/repo$path_in_repo"
   mkdir -p "$TEMP_DIR/repo$path_in_repo"
 
   unzip_file "$ooxml_file" "$TEMP_DIR/repo$path_in_repo"
@@ -251,7 +237,7 @@ EOF
 checkout_command() {
   local ooxml_file=""
   local repo_url=""
-  local path_in_repo="/"
+  local path_in_repo="/root"
   local branch_or_commit=""
 
   local force=false
@@ -306,6 +292,10 @@ checkout_command() {
 
   if [[ "${path_in_repo:0:1}" != "/" ]]; then
     path_in_repo="/$path_in_repo"
+  fi
+  if [[ "$path_in_repo" == "/" ]]; then
+    echo "[oogit] Error: path_in_repo cannot be /" >&2
+    exit 1
   fi
 
   local meta_file="${ooxml_file}.oogit"
@@ -524,11 +514,7 @@ udpate_command() {
   my_git reset --hard "$commit_hash"
   my_popd
 
-  if [[ "$path_in_repo" = "/" ]]; then
-    rm_except_for_dot_git "$TEMP_DIR/repo"
-  else
-    rm -rf "$TEMP_DIR/repo$path_in_repo"
-  fi
+  rm -rf "$TEMP_DIR/repo$path_in_repo"
   mkdir -p "$TEMP_DIR/repo$path_in_repo"
 
   unzip_file "$ooxml_file" "$TEMP_DIR/repo$path_in_repo"
