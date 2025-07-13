@@ -89,8 +89,8 @@ unzip_file() {
 init_command() {
   local ooxml_file=""
   local repo_url=""
-  local path_in_repo="/root"
   local branch=""
+  local path_in_repo="/root"
 
   local commit_message=""
   local expected_commit_hash=""
@@ -153,11 +153,11 @@ init_command() {
   repo_url="${args[1]}"
 
   if [[ ${#args[@]} -gt 2 ]]; then
-    path_in_repo="${args[2]}"
+    branch="${args[2]}"
   fi
 
   if [[ ${#args[@]} -gt 3 ]]; then
-    branch="${args[3]}"
+    path_in_repo="${args[3]}"
   fi
 
   # ================================================================ parsing end
@@ -237,8 +237,8 @@ EOF
 checkout_command() {
   local ooxml_file=""
   local repo_url=""
-  local path_in_repo="/root"
   local branch_or_commit=""
+  local path_in_repo="/root"
 
   local force=false
 
@@ -281,11 +281,11 @@ checkout_command() {
   repo_url="${args[1]}"
 
   if [[ ${#args[@]} -gt 2 ]]; then
-    path_in_repo="${args[2]}"
+    branch_or_commit="${args[2]}"
   fi
 
   if [[ ${#args[@]} -gt 3 ]]; then
-    branch_or_commit="${args[3]}"
+    path_in_repo="${args[3]}"
   fi
 
   # ================================================================ parsing end
@@ -428,7 +428,7 @@ commit_command() {
     init_args+=("-c" "$commit_hash")
   fi
 
-  init_args+=("--" "$ooxml_file" "$repo_url" "$path_in_repo" "$branch")
+  init_args+=("--" "$ooxml_file" "$repo_url" "$branch" "$path_in_repo")
 
   init_command "${init_args[@]}"
 }
@@ -655,8 +655,8 @@ Usage: $0 {help|init|checkout|commit|update|reset} ...
 
 Commands:
   help
-  init [...options] <ooxml-file> <git-repo> [path-in-repo] [branch]
-  checkout [...options] <ooxml-file> <git-repo> [path-in-repo] [branch-or-commit]
+  init [...options] <ooxml-file> <git-repo> [branch] [path-in-repo]
+  checkout [...options] <ooxml-file> <git-repo> [branch-or-commit] [path-in-repo]
   commit [...options] <ooxml-file>
   update [...options] <ooxml-file>
   reset [...options] <ooxml-file> [tag-or-commit]

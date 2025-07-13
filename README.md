@@ -22,7 +22,7 @@ cp oogit/oogit.sh /usr/local/bin/oogit
 ### `oogit init`
 
 ```bash
-oogit init [...options] <ooxml-file> <git-repo> [path-in-repo] [branch]
+oogit init [...options] <ooxml-file> <git-repo> [branch] [path-in-repo]
 ```
 
 **Behavior**
@@ -36,7 +36,7 @@ oogit init [...options] <ooxml-file> <git-repo> [path-in-repo] [branch]
 ### `oogit checkout`
 
 ```bash
-oogit checkout [...options] <ooxml-file> <git-repo> [repo-path] [branch-or-commit]
+oogit checkout [...options] <ooxml-file> <git-repo> [branch-or-commit] [repo-path]
 ```
 
 **Behavior**
