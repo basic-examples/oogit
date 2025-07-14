@@ -12,8 +12,6 @@ if ! command -v git >/dev/null 2>&1; then
   exit 1
 fi
 
-TEMP_DIR=$(mktemp -d -t oogit-XXXXXX)
-trap 'rm -rf "$TEMP_DIR"' EXIT INT TERM
 
 if [[ "${V:-0}" == "1" || "${V:-false}" == "true" || "${VERBOSE:-0}" == "1" || "${VERBOSE:-false}" == "true" ]]; then
   set -x
@@ -46,6 +44,17 @@ my_git() {
   else
     git "$@" > /dev/null 2>&1
   fi
+}
+
+setup_dirs() {
+  local ooxml_file="$1"
+  META_DIR="${ooxml_file}.oogit"
+  META_FILE="$META_DIR/metadata"
+  REPO_DIR="$META_DIR/repo"
+  TEMP_DIR="$META_DIR/tmp"
+  mkdir -p "$META_DIR"
+  rm -rf "$TEMP_DIR"
+  mkdir -p "$TEMP_DIR"
 }
 
 # may create parent directory if it does not exist
@@ -175,7 +184,9 @@ init_command() {
     exit 1
   fi
 
-  local meta_file="${ooxml_file}.oogit"
+  setup_dirs "$ooxml_file"
+  local meta_file="$META_FILE"
+  rm -rf "$REPO_DIR"
 
   if [[ "$force" == "false" ]]; then
     if [[ -f "$meta_file" ]]; then
@@ -185,23 +196,23 @@ init_command() {
   fi
 
   if [[ -n "$branch" ]]; then
-    if ! my_git clone --branch "$branch" --single-branch -- "$repo_url" "$TEMP_DIR/repo" 2>/dev/null; then
+    if ! my_git clone --branch "$branch" --single-branch -- "$repo_url" "$REPO_DIR" 2>/dev/null; then
       echo "[oogit] Branch '$branch' not found, creating new branch"
-      my_git clone --single-branch --depth 1 -- "$repo_url" "$TEMP_DIR/repo"
-      my_pushd "$TEMP_DIR/repo"
+      my_git clone --single-branch --depth 1 -- "$repo_url" "$REPO_DIR"
+      my_pushd "$REPO_DIR"
       my_git checkout --orphan "$branch"
       my_git reset --hard
       my_popd
     fi
   else
-    my_git clone --single-branch -- "$repo_url" "$TEMP_DIR/repo"
-    my_pushd "$TEMP_DIR/repo"
+    my_git clone --single-branch -- "$repo_url" "$REPO_DIR"
+    my_pushd "$REPO_DIR"
     branch=$(git branch --show-current)
     my_popd
   fi
 
   if [[ -n "$expected_commit_hash" ]]; then
-    my_pushd "$TEMP_DIR/repo"
+    my_pushd "$REPO_DIR"
     local current_commit_hash=$(git rev-parse HEAD)
     my_popd
     if [[ "$current_commit_hash" != "$expected_commit_hash" ]]; then
@@ -210,12 +221,12 @@ init_command() {
     fi
   fi
 
-  rm -rf "$TEMP_DIR/repo$path_in_repo"
-  mkdir -p "$TEMP_DIR/repo$path_in_repo"
+  rm -rf "$REPO_DIR$path_in_repo"
+  mkdir -p "$REPO_DIR$path_in_repo"
 
-  unzip_file "$ooxml_file" "$TEMP_DIR/repo$path_in_repo"
+  unzip_file "$ooxml_file" "$REPO_DIR$path_in_repo"
 
-  my_pushd "$TEMP_DIR/repo"
+  my_pushd "$REPO_DIR"
   my_git add .
   if [[ -n "$commit_message" ]]; then
     my_git commit -m "$commit_message"
@@ -306,7 +317,8 @@ checkout_command() {
     exit 1
   fi
 
-  local meta_file="${ooxml_file}.oogit"
+  setup_dirs "$ooxml_file"
+  local meta_file="$META_FILE"
 
   if [[ "$force" == "false" ]]; then
     if [[ -f "$ooxml_file" ]]; then
@@ -319,8 +331,9 @@ checkout_command() {
     fi
   fi
 
-  my_git init "$TEMP_DIR/repo"
-  my_pushd "$TEMP_DIR/repo"
+  rm -rf "$REPO_DIR"
+  my_git init "$REPO_DIR"
+  my_pushd "$REPO_DIR"
   my_git remote add origin "$repo_url"
   if [[ -n "$branch_or_commit" ]]; then
     my_git fetch --depth 1 origin "$branch_or_commit"
@@ -333,10 +346,10 @@ checkout_command() {
   my_popd
 
   if [[ "$path_in_repo" = "/" ]]; then
-    zip_dir "$TEMP_DIR/repo" "$TEMP_DIR/output.zip"
+    zip_dir "$REPO_DIR" "$TEMP_DIR/output.zip"
     mv "$TEMP_DIR/output.zip" "$ooxml_file"
   else
-    zip_dir "$TEMP_DIR/repo$path_in_repo" "$TEMP_DIR/output.zip"
+    zip_dir "$REPO_DIR$path_in_repo" "$TEMP_DIR/output.zip"
     mv "$TEMP_DIR/output.zip" "$ooxml_file"
   fi
 
@@ -399,7 +412,8 @@ commit_command() {
 
   # ================================================================ parsing end
 
-  local meta_file="${ooxml_file}.oogit"
+  setup_dirs "$ooxml_file"
+  local meta_file="$META_FILE"
 
   if [[ ! -f "$ooxml_file" ]]; then
     echo "[oogit] $ooxml_file not found. Please run checkout command first." >&2
@@ -485,7 +499,8 @@ update_command() {
 
   # ================================================================ parsing end
 
-  local meta_file="${ooxml_file}.oogit"
+  setup_dirs "$ooxml_file"
+  local meta_file="$META_FILE"
 
   if [[ ! -f "$ooxml_file" ]]; then
     echo "[oogit] $ooxml_file not found. Please run checkout command first." >&2
@@ -512,22 +527,23 @@ update_command() {
     exit 1
   fi
 
+  rm -rf "$REPO_DIR"
   if [[ -n "$branch" ]]; then
-    my_git clone --branch "$branch" --single-branch -- "$repo_url" "$TEMP_DIR/repo"
+    my_git clone --branch "$branch" --single-branch -- "$repo_url" "$REPO_DIR"
   else
-    my_git clone --single-branch -- "$repo_url" "$TEMP_DIR/repo"
+    my_git clone --single-branch -- "$repo_url" "$REPO_DIR"
   fi
 
-  my_pushd "$TEMP_DIR/repo"
+  my_pushd "$REPO_DIR"
   my_git reset --hard "$commit_hash"
   my_popd
 
-  rm -rf "$TEMP_DIR/repo$path_in_repo"
-  mkdir -p "$TEMP_DIR/repo$path_in_repo"
+  rm -rf "$REPO_DIR$path_in_repo"
+  mkdir -p "$REPO_DIR$path_in_repo"
 
-  unzip_file "$ooxml_file" "$TEMP_DIR/repo$path_in_repo"
+  unzip_file "$ooxml_file" "$REPO_DIR$path_in_repo"
 
-  my_pushd "$TEMP_DIR/repo"
+  my_pushd "$REPO_DIR"
   my_git add .
   if [[ -n "$commit_message" ]]; then
     my_git commit -m "$commit_message"
@@ -592,7 +608,8 @@ reset_command() {
 
   # ================================================================ parsing end
 
-  local meta_file="${ooxml_file}.oogit"
+  setup_dirs "$ooxml_file"
+  local meta_file="$META_FILE"
 
   if [[ ! -f "$ooxml_file" ]]; then
     echo "[oogit] $ooxml_file not found. Please run checkout command first." >&2
@@ -619,8 +636,9 @@ reset_command() {
     exit 1
   fi
 
-  my_git init "$TEMP_DIR/repo"
-  my_pushd "$TEMP_DIR/repo"
+  rm -rf "$REPO_DIR"
+  my_git init "$REPO_DIR"
+  my_pushd "$REPO_DIR"
   my_git remote add origin "$repo_url"
   if [[ -n "$tag_or_commit" ]]; then
     my_git fetch --depth 1 origin "$tag_or_commit"
@@ -633,10 +651,10 @@ reset_command() {
   my_popd
 
   if [[ "$path_in_repo" = "/" ]]; then
-    zip_dir "$TEMP_DIR/repo" "$TEMP_DIR/output.zip"
+    zip_dir "$REPO_DIR" "$TEMP_DIR/output.zip"
     mv "$TEMP_DIR/output.zip" "$ooxml_file"
   else
-    zip_dir "$TEMP_DIR/repo$path_in_repo" "$TEMP_DIR/output.zip"
+    zip_dir "$REPO_DIR$path_in_repo" "$TEMP_DIR/output.zip"
     mv "$TEMP_DIR/output.zip" "$ooxml_file"
   fi
 

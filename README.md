@@ -36,8 +36,8 @@ oogit init [...options] <ooxml-file> <git-repo> [branch] [path-in-repo]
 * Clone the Git repository (specified branch)
 * Clear contents under `path-in-repo`
 * Unzip the OOXML file and place its contents there
-* Commit the changes, then delete the local repository
-* Generate a `.oogit` metadata file
+* Commit the changes; the Git repository is stored under `<ooxml-file>.oogit/repo`
+* Generate a `.oogit/metadata` file
 
 ### `oogit checkout`
 
@@ -50,7 +50,7 @@ oogit checkout [...options] <ooxml-file> <git-repo> [branch-or-commit] [repo-pat
 * Clone the Git repository
 * Checkout the specified branch or commit
 * Generate a new OOXML file from the contents of the specified path in the repository
-* Generate a `.oogit` metadata file
+* Generate a `.oogit/metadata` file
 
 ### `oogit commit`
 
@@ -60,7 +60,7 @@ oogit commit [...options] <ooxml-file>
 
 **Behavior**
 
-* Automatically run `oogit init` using values from `<ooxml-file>.oogit` file
+* Automatically run `oogit init` using values from `<ooxml-file>.oogit/metadata` file
 
 ### `oogit update`
 
@@ -70,7 +70,7 @@ oogit update [...options] <ooxml-file>
 
 **Behavior**
 
-* Update the OOXML file using values from `<ooxml-file>.oogit` file
+* Update the OOXML file using values from `<ooxml-file>.oogit/metadata` file
 * Conflicts will not be resolved
 
 ### `oogit reset`
@@ -81,12 +81,12 @@ oogit reset [...options] <ooxml-file>
 
 **Behavior**
 
-* Reset the OOXML file to the original state using values from `<ooxml-file>.oogit` file
+* Reset the OOXML file to the original state using values from `<ooxml-file>.oogit/metadata` file
 
 ### Examples
 
 ```bash
-# Initial commit on your machine (it will generate report.pptx.oogit file as well)
+# Initial commit on your machine (it will generate report.pptx.oogit/metadata file as well)
 oogit init report.pptx https://github.com/example/repo.git documents/report
 
 # Init with custom commit message
@@ -95,13 +95,13 @@ oogit init -m "Initial commit" report.pptx https://github.com/example/repo.git d
 # Init with filename starting with dash (use -- separator)
 oogit init -m "Initial commit" -- -filename-starts-with-dash.pptx https://github.com/example/repo.git
 
-# Checkout/clone/pull (it will generate report.pptx.oogit file as well)
+# Checkout/clone/pull (it will generate report.pptx.oogit/metadata file as well)
 oogit checkout report.pptx https://github.com/example/repo.git documents/report
 
-# Usual commit - requires report.pptx.oogit file
+# Usual commit - requires report.pptx.oogit/metadata file
 oogit commit report.pptx
 
-# Usual update - requires report.pptx.oogit file, conflicts will not be resolved
+# Usual update - requires report.pptx.oogit/metadata file, conflicts will not be resolved
 oogit update report.pptx
 
 # Reset when you want to revert to the original state
@@ -110,7 +110,7 @@ oogit reset report.pptx
 
 ### Metadata File Format
 
-The `.oogit` file contains metadata in the following format (one value per line):
+The `.oogit/metadata` file contains metadata in the following format (one value per line):
 
 ```text
 1
