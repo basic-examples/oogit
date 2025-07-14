@@ -714,7 +714,7 @@ Options:
   -h, --help                Show this help message and exit
   --                        End of optionstreat remaining arguments as positional
   -m, --message <message>   Specify commit message
-                            for init/commit command
+                            for init/commit/update command
   -c, --commit-hash <hash>  Exit with code 1 if latest commit hash does not match
                             for init command
   -f, --force               Overwrite existing file
