@@ -77,8 +77,6 @@ Restore the OOXML file to the exact state stored in the repository.
 oogit reset [options] <ooxml-file> [tag-or-commit]
 ```
 
-Line 1 is the file format version. The remaining lines record the repository location, target branch, and the commit hash used to generate the latest document.
-
 ## License
 
 MIT License
