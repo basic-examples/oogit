@@ -690,7 +690,7 @@ EOF
 }
 
 version_command() {
-  echo "oogit 0.1.0"
+  echo "oogit 0.1.1"
 }
 
 help_command() {
