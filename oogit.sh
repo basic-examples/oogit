@@ -46,15 +46,33 @@ my_git() {
   fi
 }
 
-setup_dirs() {
+ensure_dirs() {
   local ooxml_file="$1"
+
   META_DIR="${ooxml_file}.oogit"
   META_FILE="$META_DIR/metadata"
   REPO_DIR="$META_DIR/repo"
   TEMP_DIR="$META_DIR/tmp"
+
+  rm -rf "$TEMP_DIR"
+  trap 'rm -rf "$TEMP_DIR"' EXIT INT TERM
+
+  if [[ ! -d "$META_DIR" ]]; then
+    echo "[oogit] Error: $META_DIR does not exist" >&2
+    exit 1
+  fi
+}
+
+setup_dirs() {
+  local ooxml_file="$1"
+
+  META_DIR="${ooxml_file}.oogit"
+  META_FILE="$META_DIR/metadata"
+  REPO_DIR="$META_DIR/repo"
+  TEMP_DIR="$META_DIR/tmp"
+
   mkdir -p "$META_DIR"
   rm -rf "$TEMP_DIR"
-  mkdir -p "$TEMP_DIR"
 }
 
 # may create parent directory if it does not exist
@@ -76,7 +94,8 @@ zip_dir() {
   local src_dir="$1"
   local out_file="$2"
   if command -v zip >/dev/null 2>&1; then
-    (cd "$src_dir" && zip -qr "$out_file" .)
+    local out_file_absolute=$(cd "$(dirname "$out_file")" && pwd)/$(basename "$out_file")
+    (cd "$src_dir" && zip -qr "$out_file_absolute" .)
   elif command -v powershell.exe >/dev/null 2>&1; then
     powershell.exe -NoProfile -Command \
       "Compress-Archive -Path '$(convert_path_windows "$src_dir")\\*' -DestinationPath '$(convert_path_windows "$out_file")' -Force"
@@ -185,15 +204,19 @@ init_command() {
   fi
 
   setup_dirs "$ooxml_file"
-  local meta_file="$META_FILE"
-  rm -rf "$REPO_DIR"
 
   if [[ "$force" == "false" ]]; then
-    if [[ -f "$meta_file" ]]; then
-      echo "[oogit] $meta_file already exists. Please run with --force option to overwrite." >&2
+    if [[ -f "$META_FILE" ]]; then
+      echo "[oogit] $META_FILE already exists. Please run with --force option to overwrite." >&2
+      exit 1
+    fi
+    if [[ -d "$REPO_DIR" ]]; then
+      echo "[oogit] $REPO_DIR already exists. Please run with --force option to overwrite." >&2
       exit 1
     fi
   fi
+
+  rm -rf "$REPO_DIR"
 
   if [[ -n "$branch" ]]; then
     if ! my_git clone --branch "$branch" --single-branch -- "$repo_url" "$REPO_DIR" 2>/dev/null; then
@@ -244,7 +267,7 @@ init_command() {
   local commit_hash=$(git rev-parse HEAD)
   my_popd
 
-  cat > "$meta_file" <<EOF
+  cat > "$META_FILE" <<EOF
 1
 $repo_url
 $path_in_repo
@@ -318,22 +341,21 @@ checkout_command() {
   fi
 
   setup_dirs "$ooxml_file"
-  local meta_file="$META_FILE"
 
   if [[ "$force" == "false" ]]; then
     if [[ -f "$ooxml_file" ]]; then
       echo "[oogit] $ooxml_file already exists. Please run with --force option to overwrite." >&2
       exit 1
     fi
-    if [[ -f "$meta_file" ]]; then
-      echo "[oogit] $meta_file already exists. Please run with --force option to overwrite." >&2
+    if [[ -f "$META_FILE" ]]; then
+      echo "[oogit] $META_FILE already exists. Please run with --force option to overwrite." >&2
       exit 1
     fi
   fi
 
-  rm -rf "$REPO_DIR"
-  my_git init "$REPO_DIR"
-  my_pushd "$REPO_DIR"
+  mkdir -p "$TEMP_DIR/repo"
+  my_git init "$TEMP_DIR/repo"
+  my_pushd "$TEMP_DIR/repo"
   my_git remote add origin "$repo_url"
   if [[ -n "$branch_or_commit" ]]; then
     my_git fetch --depth 1 origin "$branch_or_commit"
@@ -345,15 +367,10 @@ checkout_command() {
   local commit_hash=$(git rev-parse HEAD)
   my_popd
 
-  if [[ "$path_in_repo" = "/" ]]; then
-    zip_dir "$REPO_DIR" "$TEMP_DIR/output.zip"
-    mv "$TEMP_DIR/output.zip" "$ooxml_file"
-  else
-    zip_dir "$REPO_DIR$path_in_repo" "$TEMP_DIR/output.zip"
-    mv "$TEMP_DIR/output.zip" "$ooxml_file"
-  fi
+  zip_dir "$TEMP_DIR/repo$path_in_repo" "$TEMP_DIR/output.zip"
+  mv "$TEMP_DIR/output.zip" "$ooxml_file"
 
-  cat > "$meta_file" <<EOF
+  cat > "$META_FILE" <<EOF
 1
 $repo_url
 $path_in_repo
@@ -412,22 +429,21 @@ commit_command() {
 
   # ================================================================ parsing end
 
-  setup_dirs "$ooxml_file"
-  local meta_file="$META_FILE"
+  ensure_dirs "$ooxml_file"
 
   if [[ ! -f "$ooxml_file" ]]; then
     echo "[oogit] $ooxml_file not found. Please run checkout command first." >&2
     exit 1
   fi
-  if [[ ! -f "$meta_file" ]]; then
-    echo "[oogit] $meta_file not found. Please run init or checkout command first." >&2
+  if [[ ! -f "$META_FILE" ]]; then
+    echo "[oogit] $META_FILE not found. Please run init or checkout command first." >&2
     exit 1
   fi
 
   local lines=()
   while IFS= read -r line || [[ -n "$line" ]]; do
     lines+=("$line")
-  done < "$meta_file"
+  done < "$META_FILE"
 
   local file_version="${lines[0]}"
   local repo_url="${lines[1]}"
@@ -458,6 +474,7 @@ commit_command() {
 update_command() {
   local ooxml_file=""
 
+  local commit_message=""
   local force=false
 
   local args=()
@@ -469,6 +486,15 @@ update_command() {
         --)
           parsing_options=false
           shift
+          ;;
+        -m|--message)
+          if [[ -n "${2:-}" && "${2:0:1}" != "-" ]]; then
+            commit_message="$2"
+            shift 2
+          else
+            echo "[oogit] Error: -m/--message requires a value" >&2
+            exit 1
+          fi
           ;;
         -f|--force)
           force=true
@@ -499,22 +525,21 @@ update_command() {
 
   # ================================================================ parsing end
 
-  setup_dirs "$ooxml_file"
-  local meta_file="$META_FILE"
+  ensure_dirs "$ooxml_file"
 
   if [[ ! -f "$ooxml_file" ]]; then
     echo "[oogit] $ooxml_file not found. Please run checkout command first." >&2
     exit 1
   fi
-  if [[ ! -f "$meta_file" ]]; then
-    echo "[oogit] $meta_file not found. Please run init or checkout command first." >&2
+  if [[ ! -f "$META_FILE" ]]; then
+    echo "[oogit] $META_FILE not found. Please run init or checkout command first." >&2
     exit 1
   fi
 
   local lines=()
   while IFS= read -r line || [[ -n "$line" ]]; do
     lines+=("$line")
-  done < "$meta_file"
+  done < "$META_FILE"
 
   local file_version="${lines[0]}"
   local repo_url="${lines[1]}"
@@ -545,10 +570,12 @@ update_command() {
 
   my_pushd "$REPO_DIR"
   my_git add .
-  if [[ -n "$commit_message" ]]; then
-    my_git commit -m "$commit_message"
-  else
-    git commit
+  if ! git diff-index --quiet HEAD; then
+    if [[ -n "$commit_message" ]]; then
+      my_git commit -m "$commit_message"
+    else
+      git commit
+    fi
   fi
 
   my_git pull
@@ -556,7 +583,7 @@ update_command() {
   local commit_hash=$(git rev-parse HEAD)
   my_popd
 
-  cat > "$meta_file" <<EOF
+  cat > "$META_FILE" <<EOF
 1
 $repo_url
 $path_in_repo
@@ -608,22 +635,21 @@ reset_command() {
 
   # ================================================================ parsing end
 
-  setup_dirs "$ooxml_file"
-  local meta_file="$META_FILE"
+  ensure_dirs "$ooxml_file"
 
   if [[ ! -f "$ooxml_file" ]]; then
     echo "[oogit] $ooxml_file not found. Please run checkout command first." >&2
     exit 1
   fi
-  if [[ ! -f "$meta_file" ]]; then
-    echo "[oogit] $meta_file not found. Please run init or checkout command first." >&2
+  if [[ ! -f "$META_FILE" ]]; then
+    echo "[oogit] $META_FILE not found. Please run init or checkout command first." >&2
     exit 1
   fi
 
   local lines=()
   while IFS= read -r line || [[ -n "$line" ]]; do
     lines+=("$line")
-  done < "$meta_file"
+  done < "$META_FILE"
 
   local file_version="${lines[0]}"
   local repo_url="${lines[1]}"
@@ -650,15 +676,11 @@ reset_command() {
   local new_commit_hash=$(git rev-parse HEAD)
   my_popd
 
-  if [[ "$path_in_repo" = "/" ]]; then
-    zip_dir "$REPO_DIR" "$TEMP_DIR/output.zip"
-    mv "$TEMP_DIR/output.zip" "$ooxml_file"
-  else
-    zip_dir "$REPO_DIR$path_in_repo" "$TEMP_DIR/output.zip"
-    mv "$TEMP_DIR/output.zip" "$ooxml_file"
-  fi
+  mkdir -p "$TEMP_DIR"
+  zip_dir "$REPO_DIR$path_in_repo" "$TEMP_DIR/output.zip"
+  mv "$TEMP_DIR/output.zip" "$ooxml_file"
 
-  cat > "$meta_file" <<EOF
+  cat > "$META_FILE" <<EOF
 1
 $repo_url
 $path_in_repo
