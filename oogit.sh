@@ -73,6 +73,7 @@ setup_dirs() {
 
   mkdir -p "$META_DIR"
   rm -rf "$TEMP_DIR"
+  trap 'rm -rf "$TEMP_DIR"' EXIT INT TERM
 }
 
 # may create parent directory if it does not exist
@@ -279,7 +280,7 @@ EOF
 checkout_command() {
   local ooxml_file=""
   local repo_url=""
-  local branch_or_commit=""
+  local branch=""
   local path_in_repo="/root"
 
   local force=false
@@ -323,7 +324,7 @@ checkout_command() {
   repo_url="${args[1]}"
 
   if [[ ${#args[@]} -gt 2 ]]; then
-    branch_or_commit="${args[2]}"
+    branch="${args[2]}"
   fi
 
   if [[ ${#args[@]} -gt 3 ]]; then
@@ -353,28 +354,25 @@ checkout_command() {
     fi
   fi
 
-  mkdir -p "$TEMP_DIR/repo"
-  my_git init "$TEMP_DIR/repo"
-  my_pushd "$TEMP_DIR/repo"
-  my_git remote add origin "$repo_url"
-  if [[ -n "$branch_or_commit" ]]; then
-    my_git fetch --depth 1 origin "$branch_or_commit"
+  if [[ -n "$branch" ]]; then
+    my_git clone --branch "$branch" --single-branch -- "$repo_url" "$REPO_DIR"
   else
-    my_git fetch --depth 1 origin
+    my_git clone --single-branch -- "$repo_url" "$REPO_DIR"
   fi
-  my_git checkout FETCH_HEAD
 
+  my_pushd "$REPO_DIR"
   local commit_hash=$(git rev-parse HEAD)
   my_popd
 
-  zip_dir "$TEMP_DIR/repo$path_in_repo" "$TEMP_DIR/output.zip"
+  mkdir -p "$TEMP_DIR"
+  zip_dir "$REPO_DIR$path_in_repo" "$TEMP_DIR/output.zip"
   mv "$TEMP_DIR/output.zip" "$ooxml_file"
 
   cat > "$META_FILE" <<EOF
 1
 $repo_url
 $path_in_repo
-${branch_or_commit}
+${branch}
 $commit_hash
 EOF
 }
@@ -690,7 +688,7 @@ EOF
 }
 
 version_command() {
-  echo "oogit 0.1.1"
+  echo "oogit 0.1.2"
 }
 
 help_command() {
