@@ -20,7 +20,7 @@ else
   VERBOSE=false
 fi
 
-my_pushd() {
+silent_pushd() {
   local dir="$1"
 
   if [[ "$VERBOSE" == "true" ]]; then
@@ -30,7 +30,7 @@ my_pushd() {
   fi
 }
 
-my_popd() {
+silent_popd() {
   if [[ "$VERBOSE" == "true" ]]; then
     popd
   else
@@ -38,7 +38,7 @@ my_popd() {
   fi
 }
 
-my_git() {
+silent_git() {
   if [[ "$VERBOSE" == "true" ]]; then
     git "$@"
   else
@@ -144,6 +144,100 @@ unzip_file() {
   fi
 }
 
+
+fetch_and_reset() {
+  local repo_dir="$1"
+  local commit_hash="$2"
+
+  silent_pushd "$repo_dir"
+  silent_git fetch
+  silent_git reset --hard "$commit_hash"
+  silent_popd
+}
+
+unzip_file_to_repo() {
+  local repo_dir="$1"
+  local path_in_repo="$2"
+  local ooxml_file="$3"
+
+  rm -rf "$repo_dir$path_in_repo"
+  mkdir -p "$repo_dir$path_in_repo"
+  unzip_file "$ooxml_file" "$repo_dir$path_in_repo"
+}
+
+git_commit() {
+  local repo_dir="$1"
+  local commit_message="$2"
+
+  silent_pushd "$repo_dir"
+  silent_git add .
+  if ! silent_git diff-index --quiet HEAD; then
+    if [[ -n "$commit_message" ]]; then
+      silent_git commit -m "$commit_message"
+    else
+      git commit
+    fi
+  fi
+  silent_popd
+}
+
+git_pull() {
+  local repo_dir="$1"
+
+  silent_pushd "$REPO_DIR"
+  silent_git pull --no-rebase
+  silent_popd
+}
+
+git_push() {
+  local repo_dir="$1"
+  local branch="$2"
+
+  silent_pushd "$REPO_DIR"
+
+  local remote_name=$(git remote | head -n1)
+  if [[ -z "$remote_name" ]]; then
+    echo "[oogit] Error: No remote found" >&2
+    exit 1
+  fi
+  silent_git push --set-upstream "$remote_name" "$branch"
+  silent_popd
+}
+
+git_get_commit_hash() {
+  local repo_dir="$1"
+
+  silent_pushd "$repo_dir"
+  git rev-parse HEAD
+  silent_popd
+}
+
+zip_dir_from_repo() {
+  local repo_dir="$1"
+  local path_in_repo="$2"
+  local ooxml_file="$3"
+
+  mkdir -p "$TEMP_DIR"
+  zip_dir "$repo_dir$path_in_repo" "$TEMP_DIR/output.zip"
+  mv "$TEMP_DIR/output.zip" "$ooxml_file"
+}
+
+write_metadata() {
+  local repo_url="$1"
+  local path_in_repo="$2"
+  local branch="$3"
+  local commit_hash="$4"
+
+  cat > "$META_FILE" <<EOF
+1
+$repo_url
+$path_in_repo
+$branch
+$commit_hash
+EOF
+}
+
+
 init_command() {
   local ooxml_file=""
   local repo_url=""
@@ -244,61 +338,37 @@ init_command() {
   rm -rf "$REPO_DIR"
 
   if [[ -n "$branch" ]]; then
-    if ! my_git clone --branch "$branch" --single-branch -- "$repo_url" "$REPO_DIR" 2>/dev/null; then
+    if ! silent_git clone --branch "$branch" --single-branch -- "$repo_url" "$REPO_DIR" 2>/dev/null; then
       echo "[oogit] Branch '$branch' not found, creating new branch"
-      my_git clone --single-branch --depth 1 -- "$repo_url" "$REPO_DIR"
-      my_pushd "$REPO_DIR"
-      my_git checkout --orphan "$branch"
-      my_git reset --hard
-      my_popd
+      silent_git clone --single-branch --depth 1 -- "$repo_url" "$REPO_DIR"
+      silent_pushd "$REPO_DIR"
+      silent_git checkout --orphan "$branch"
+      silent_git reset --hard
+      silent_popd
     fi
   else
-    my_git clone --single-branch -- "$repo_url" "$REPO_DIR"
-    my_pushd "$REPO_DIR"
+    silent_git clone --single-branch -- "$repo_url" "$REPO_DIR"
+    silent_pushd "$REPO_DIR"
     branch=$(git branch --show-current)
-    my_popd
+    silent_popd
   fi
 
   if [[ -n "$expected_commit_hash" ]]; then
-    my_pushd "$REPO_DIR"
+    silent_pushd "$REPO_DIR"
     local current_commit_hash=$(git rev-parse HEAD)
-    my_popd
+    silent_popd
     if [[ "$current_commit_hash" != "$expected_commit_hash" ]]; then
       echo "[oogit] Error: Commit hash mismatch" >&2
       exit 1
     fi
   fi
 
-  rm -rf "$REPO_DIR$path_in_repo"
-  mkdir -p "$REPO_DIR$path_in_repo"
+  unzip_file_to_repo "$REPO_DIR" "$path_in_repo" "$ooxml_file"
 
-  unzip_file "$ooxml_file" "$REPO_DIR$path_in_repo"
-
-  my_pushd "$REPO_DIR"
-  my_git add .
-  if [[ -n "$commit_message" ]]; then
-    my_git commit -m "$commit_message"
-  else
-    git commit
-  fi
-
-  local remote_name=$(git remote | head -n1)
-  if [[ -z "$remote_name" ]]; then
-    echo "[oogit] Error: No remote found" >&2
-    exit 1
-  fi
-  my_git push --set-upstream "$remote_name" "$branch"
-
-  local commit_hash=$(git rev-parse HEAD)
-  my_popd
-
-  cat > "$META_FILE" <<EOF
-1
-$repo_url
-$path_in_repo
-${branch}
-$commit_hash
-EOF
+  git_commit "$REPO_DIR" "$commit_message"
+  git_push "$REPO_DIR" "$branch"
+  local commit_hash=$(git_get_commit_hash "$REPO_DIR")
+  write_metadata "$repo_url" "$path_in_repo" "$branch" "$commit_hash"
 }
 
 checkout_command() {
@@ -379,26 +449,17 @@ checkout_command() {
   fi
 
   if [[ -n "$branch" ]]; then
-    my_git clone --branch "$branch" --single-branch -- "$repo_url" "$REPO_DIR"
+    silent_git clone --branch "$branch" --single-branch -- "$repo_url" "$REPO_DIR"
   else
-    my_git clone --single-branch -- "$repo_url" "$REPO_DIR"
+    silent_git clone --single-branch -- "$repo_url" "$REPO_DIR"
+    silent_pushd "$REPO_DIR"
+    branch=$(git branch --show-current)
+    silent_popd
   fi
 
-  my_pushd "$REPO_DIR"
-  local commit_hash=$(git rev-parse HEAD)
-  my_popd
-
-  mkdir -p "$TEMP_DIR"
-  zip_dir "$REPO_DIR$path_in_repo" "$TEMP_DIR/output.zip"
-  mv "$TEMP_DIR/output.zip" "$ooxml_file"
-
-  cat > "$META_FILE" <<EOF
-1
-$repo_url
-$path_in_repo
-${branch}
-$commit_hash
-EOF
+  zip_dir_from_repo "$REPO_DIR" "$path_in_repo" "$ooxml_file"
+  local commit_hash=$(git_get_commit_hash "$REPO_DIR")
+  write_metadata "$repo_url" "$path_in_repo" "$branch" "$commit_hash"
 }
 
 commit_command() {
@@ -463,45 +524,13 @@ commit_command() {
   local branch="$METADATA_BRANCH"
   local commit_hash="$METADATA_COMMIT_HASH"
 
-  my_pushd "$REPO_DIR"
-  my_git fetch
-  my_git reset --hard "$commit_hash"
-  my_popd
-
-  rm -rf "$REPO_DIR$path_in_repo"
-  mkdir -p "$REPO_DIR$path_in_repo"
-
-  unzip_file "$ooxml_file" "$REPO_DIR$path_in_repo"
-
-  my_pushd "$REPO_DIR"
-  my_git add .
-  if ! git diff-index --quiet HEAD; then
-    if [[ -n "$commit_message" ]]; then
-      my_git commit -m "$commit_message"
-    else
-      git commit
-    fi
-  fi
-
-  my_git pull --no-rebase
-
-  local remote_name=$(git remote | head -n1)
-  if [[ -z "$remote_name" ]]; then
-    echo "[oogit] Error: No remote found" >&2
-    exit 1
-  fi
-  my_git push --set-upstream "$remote_name" "$branch"
-
-  local commit_hash=$(git rev-parse HEAD)
-  my_popd
-
-  cat > "$META_FILE" <<EOF
-1
-$repo_url
-$path_in_repo
-${branch}
-$commit_hash
-EOF
+  fetch_and_reset "$REPO_DIR" "$commit_hash"
+  unzip_file_to_repo "$REPO_DIR" "$path_in_repo" "$ooxml_file"
+  git_commit "$REPO_DIR" "$commit_message"
+  git_pull "$REPO_DIR"
+  git_push "$REPO_DIR" "$branch"
+  local commit_hash=$(git_get_commit_hash "$REPO_DIR")
+  write_metadata "$repo_url" "$path_in_repo" "$branch" "$commit_hash"
 }
 
 update_command() {
@@ -570,45 +599,13 @@ update_command() {
   local branch="$METADATA_BRANCH"
   local commit_hash="$METADATA_COMMIT_HASH"
 
-  my_pushd "$REPO_DIR"
-  my_git fetch
-  my_git reset --hard "$commit_hash"
-  my_popd
-
-  rm -rf "$REPO_DIR$path_in_repo"
-  mkdir -p "$REPO_DIR$path_in_repo"
-
-  unzip_file "$ooxml_file" "$REPO_DIR$path_in_repo"
-
-  my_pushd "$REPO_DIR"
-  my_git add .
-  if ! git diff-index --quiet HEAD; then
-    if [[ -n "$commit_message" ]]; then
-      my_git commit -m "$commit_message"
-    else
-      git commit
-    fi
-  fi
-
-  my_git pull --no-rebase
-
-  local remote_name=$(git remote | head -n1)
-  if [[ -z "$remote_name" ]]; then
-    echo "[oogit] Error: No remote found" >&2
-    exit 1
-  fi
-  my_git push --set-upstream "$remote_name" "$branch"
-
-  local commit_hash=$(git rev-parse HEAD)
-  my_popd
-
-  cat > "$META_FILE" <<EOF
-1
-$repo_url
-$path_in_repo
-${branch}
-$commit_hash
-EOF
+  fetch_and_reset "$REPO_DIR" "$commit_hash"
+  unzip_file_to_repo "$REPO_DIR" "$path_in_repo" "$ooxml_file"
+  git_commit "$REPO_DIR" "$commit_message"
+  git_pull "$REPO_DIR"
+  git_push "$REPO_DIR" "$branch"
+  local commit_hash=$(git_get_commit_hash "$REPO_DIR")
+  write_metadata "$repo_url" "$path_in_repo" "$branch" "$commit_hash"
 }
 
 reset_command() {
@@ -666,31 +663,14 @@ reset_command() {
   local branch="$METADATA_BRANCH"
   local commit_hash="$METADATA_COMMIT_HASH"
 
-  rm -rf "$REPO_DIR"
-  my_git init "$REPO_DIR"
-  my_pushd "$REPO_DIR"
-  my_git remote add origin "$repo_url"
-  if [[ -n "$tag_or_commit" ]]; then
-    my_git fetch --depth 1 origin "$tag_or_commit"
-  else
-    my_git fetch --depth 1 origin
-  fi
-  my_git checkout FETCH_HEAD
-
+  silent_pushd "$REPO_DIR"
+  silent_git fetch
+  silent_git reset --hard "$tag_or_commit"
   local new_commit_hash=$(git rev-parse HEAD)
-  my_popd
+  silent_popd
 
-  mkdir -p "$TEMP_DIR"
-  zip_dir "$REPO_DIR$path_in_repo" "$TEMP_DIR/output.zip"
-  mv "$TEMP_DIR/output.zip" "$ooxml_file"
-
-  cat > "$META_FILE" <<EOF
-1
-$repo_url
-$path_in_repo
-${branch}
-$new_commit_hash
-EOF
+  zip_dir_from_repo "$REPO_DIR" "$path_in_repo" "$ooxml_file"
+  write_metadata "$repo_url" "$path_in_repo" "$branch" "$new_commit_hash"
 }
 
 version_command() {
