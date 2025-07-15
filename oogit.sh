@@ -570,7 +570,7 @@ update_command() {
     fi
   fi
 
-  my_git pull
+  my_git pull --no-rebase
 
   local commit_hash=$(git rev-parse HEAD)
   my_popd
