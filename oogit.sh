@@ -194,7 +194,7 @@ my_git_commit_intermediate() {
   while true; do
     IFS= read -r -d '' status || break
     IFS= read -r -d '' file || break
-    if [[ "$status" == A || "$status" == M ]] && [[ -f "$file" ]]; then
+    if [[ "$status" == A || "$status" == M || "$status" == R ]] && [[ -f "$file" ]]; then
       mv "$file" "${path_in_repo#/}/oogit-intermediate-name-$TMP_INDEX"
       ((TMP_INDEX++))
     fi
