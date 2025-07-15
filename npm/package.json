@@ -2,11 +2,12 @@
   "private": true,
   "name": "oogit",
   "type": "module",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "oogit is a CLI tool to version control OOXML files",
   "bin": {
     "oogit": "bin.js"
   },
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/basic-examples/oogit.git"

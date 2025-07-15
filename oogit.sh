@@ -706,7 +706,7 @@ reset_command() {
 }
 
 version_command() {
-  echo "oogit 0.2.0"
+  echo "oogit 0.2.1"
 }
 
 help_command() {
