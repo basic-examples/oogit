@@ -95,6 +95,7 @@ oogit reset [options] <ooxml-file> [tag-or-commit]
 - `0.1.1`: fix unhelpful document
 - `0.1.2`: minor improvement (reuse checkout repo, add tmp cleanup)
 - `0.1.3`: update outdated document
+- `0.2.0`: added basic rename handliung, but very poor
 
 ## License
 
