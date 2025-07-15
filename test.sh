@@ -139,7 +139,7 @@ bash oogit.sh init -m "init branch" "$TMP_DIR/branch.docx" "$REPO" branch
 git clone --branch branch "$REPO" "$TMP_DIR/tmp-repo"
 echo "isolated" | diff - "$TMP_DIR/tmp-repo/root/content.txt"
 pushd "$TMP_DIR/tmp-repo" >/dev/null
-git rev-list --max-count=3 HEAD | wc -l | tr -d '[:space:]' | grep -q 1
+git rev-list --max-count=3 HEAD | wc -l | tr -d '[:space:]' | grep -q 2
 popd >/dev/null
 rm -rf "$TMP_DIR/tmp-repo"
 

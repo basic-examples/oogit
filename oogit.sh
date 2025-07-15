@@ -165,17 +165,44 @@ unzip_file_to_repo() {
   unzip_file "$ooxml_file" "$repo_dir$path_in_repo"
 }
 
-git_commit() {
+my_git_commit() {
   local repo_dir="$1"
-  local commit_message="$2"
+  local path_in_repo="$2"
+  local commit_message="$3"
 
-  silent_pushd "$repo_dir"
+  silent_pushd "$repo_dir$path_in_repo"
   silent_git add .
   if ! silent_git diff-index --quiet HEAD; then
     if [[ -n "$commit_message" ]]; then
       silent_git commit -m "$commit_message"
     else
       git commit
+    fi
+  fi
+  silent_popd
+}
+
+my_git_commit_intermediate() {
+  local repo_dir="$1"
+  local path_in_repo="$2"
+
+  silent_pushd "$repo_dir$path_in_repo"
+  silent_git add .
+  silent_popd
+  silent_pushd "$repo_dir"
+  TMP_INDEX=0
+  while true; do
+    IFS= read -r -d '' status || break
+    IFS= read -r -d '' file || break
+    if [[ "$status" == A || "$status" == M ]] && [[ -f "$file" ]]; then
+      mv "$file" "${path_in_repo#/}/oogit-intermediate-name-$TMP_INDEX"
+      ((TMP_INDEX++))
+    fi
+  done < <(git diff --cached --name-status -z)
+  if [[ "$TMP_INDEX" -gt 0 ]]; then
+    silent_git add .
+    if ! silent_git diff-index --quiet HEAD; then
+      silent_git commit -m "[oogit-intermediate-commit]"
     fi
   fi
   silent_popd
@@ -364,8 +391,9 @@ init_command() {
   fi
 
   unzip_file_to_repo "$REPO_DIR" "$path_in_repo" "$ooxml_file"
-
-  git_commit "$REPO_DIR" "$commit_message"
+  my_git_commit_intermediate "$REPO_DIR" "$path_in_repo"
+  unzip_file_to_repo "$REPO_DIR" "$path_in_repo" "$ooxml_file"
+  my_git_commit "$REPO_DIR" "$path_in_repo" "$commit_message"
   git_push "$REPO_DIR" "$branch"
   local commit_hash=$(git_get_commit_hash "$REPO_DIR")
   write_metadata "$repo_url" "$path_in_repo" "$branch" "$commit_hash"
@@ -526,7 +554,9 @@ commit_command() {
 
   fetch_and_reset "$REPO_DIR" "$commit_hash"
   unzip_file_to_repo "$REPO_DIR" "$path_in_repo" "$ooxml_file"
-  git_commit "$REPO_DIR" "$commit_message"
+  my_git_commit_intermediate "$REPO_DIR" "$path_in_repo"
+  unzip_file_to_repo "$REPO_DIR" "$path_in_repo" "$ooxml_file"
+  my_git_commit "$REPO_DIR" "$path_in_repo" "$commit_message"
   git_pull "$REPO_DIR"
   git_push "$REPO_DIR" "$branch"
   local commit_hash=$(git_get_commit_hash "$REPO_DIR")
@@ -601,7 +631,9 @@ update_command() {
 
   fetch_and_reset "$REPO_DIR" "$commit_hash"
   unzip_file_to_repo "$REPO_DIR" "$path_in_repo" "$ooxml_file"
-  git_commit "$REPO_DIR" "$commit_message"
+  my_git_commit_intermediate "$REPO_DIR" "$path_in_repo"
+  unzip_file_to_repo "$REPO_DIR" "$path_in_repo" "$ooxml_file"
+  my_git_commit "$REPO_DIR" "$path_in_repo" "$commit_message"
   git_pull "$REPO_DIR"
   git_push "$REPO_DIR" "$branch"
   local commit_hash=$(git_get_commit_hash "$REPO_DIR")
