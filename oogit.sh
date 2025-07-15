@@ -463,19 +463,45 @@ commit_command() {
   local branch="$METADATA_BRANCH"
   local commit_hash="$METADATA_COMMIT_HASH"
 
-  local init_args=()
+  my_pushd "$REPO_DIR"
+  my_git fetch
+  my_git reset --hard "$commit_hash"
+  my_popd
 
-  if [[ -n "$commit_message" ]]; then
-    init_args+=("-m" "$commit_message")
+  rm -rf "$REPO_DIR$path_in_repo"
+  mkdir -p "$REPO_DIR$path_in_repo"
+
+  unzip_file "$ooxml_file" "$REPO_DIR$path_in_repo"
+
+  my_pushd "$REPO_DIR"
+  my_git add .
+  if ! git diff-index --quiet HEAD; then
+    if [[ -n "$commit_message" ]]; then
+      my_git commit -m "$commit_message"
+    else
+      git commit
+    fi
   fi
 
-  if [[ -n "$commit_hash" ]]; then
-    init_args+=("-c" "$commit_hash")
+  my_git pull --no-rebase
+
+  local remote_name=$(git remote | head -n1)
+  if [[ -z "$remote_name" ]]; then
+    echo "[oogit] Error: No remote found" >&2
+    exit 1
   fi
+  my_git push --set-upstream "$remote_name" "$branch"
 
-  init_args+=("--force" "--" "$ooxml_file" "$repo_url" "$branch" "$path_in_repo")
+  local commit_hash=$(git rev-parse HEAD)
+  my_popd
 
-  init_command "${init_args[@]}"
+  cat > "$META_FILE" <<EOF
+1
+$repo_url
+$path_in_repo
+${branch}
+$commit_hash
+EOF
 }
 
 update_command() {
@@ -544,14 +570,8 @@ update_command() {
   local branch="$METADATA_BRANCH"
   local commit_hash="$METADATA_COMMIT_HASH"
 
-  rm -rf "$REPO_DIR"
-  if [[ -n "$branch" ]]; then
-    my_git clone --branch "$branch" --single-branch -- "$repo_url" "$REPO_DIR"
-  else
-    my_git clone --single-branch -- "$repo_url" "$REPO_DIR"
-  fi
-
   my_pushd "$REPO_DIR"
+  my_git fetch
   my_git reset --hard "$commit_hash"
   my_popd
 
@@ -571,6 +591,13 @@ update_command() {
   fi
 
   my_git pull --no-rebase
+
+  local remote_name=$(git remote | head -n1)
+  if [[ -z "$remote_name" ]]; then
+    echo "[oogit] Error: No remote found" >&2
+    exit 1
+  fi
+  my_git push --set-upstream "$remote_name" "$branch"
 
   local commit_hash=$(git rev-parse HEAD)
   my_popd
