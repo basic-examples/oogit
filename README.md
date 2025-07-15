@@ -6,7 +6,7 @@ Manage Word, Excel, and PowerPoint files with Git — like you would with SVN.
 stores its contents in a regular Git repository,
 and reassembles the file when you are done.
 
-Works on both POSIX and Windows systems.
+Works on both POSIX and Windows systems (via Git Bash).
 
 ## Installation
 
@@ -59,10 +59,10 @@ oogit init [options] <ooxml-file> <git-repo> [branch] [path-in-repo]
 
 ### `checkout`
 
-Reconstruct an OOXML file from a Git repository at a specific branch or commit.
+Reconstruct an OOXML file from a Git repository at a specific branch.
 
 ```sh
-oogit checkout [options] <ooxml-file> <git-repo> [branch-or-commit] [path-in-repo]
+oogit checkout [options] <ooxml-file> <git-repo> [branch] [path-in-repo]
 ```
 
 ### `commit`
@@ -88,6 +88,13 @@ Restore the OOXML file to a specific tag or commit from the repository.
 ```sh
 oogit reset [options] <ooxml-file> [tag-or-commit]
 ```
+
+## Version History
+
+- `0.1.0`: initial stable version
+- `0.1.1`: fix unhelpful document
+- `0.1.2`: minor improvement (reuse checkout repo, add tmp cleanup)
+- `0.1.3`: update outdated document
 
 ## License
 

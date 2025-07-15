@@ -688,7 +688,7 @@ EOF
 }
 
 version_command() {
-  echo "oogit 0.1.2"
+  echo "oogit 0.1.3"
 }
 
 help_command() {
@@ -702,7 +702,7 @@ Usage: $NAME {help|init|checkout|commit|update|reset} ...
 Commands:
   help
   init [...options] <ooxml-file> <git-repo> [branch] [path-in-repo]
-  checkout [...options] <ooxml-file> <git-repo> [branch-or-commit] [path-in-repo]
+  checkout [...options] <ooxml-file> <git-repo> [branch] [path-in-repo]
   commit [...options] <ooxml-file>
   update [...options] <ooxml-file>
   reset [...options] <ooxml-file> [tag-or-commit]
