@@ -46,6 +46,30 @@ my_git() {
   fi
 }
 
+# Load metadata from $META_FILE and expose the result via global variables
+load_metadata() {
+  if [[ ! -f "$META_FILE" ]]; then
+    echo "[oogit] $META_FILE not found. Please run init or checkout command first." >&2
+    exit 1
+  fi
+
+  local lines=()
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    lines+=("$line")
+  done < "$META_FILE"
+
+  METADATA_VERSION="${lines[0]}"
+  METADATA_REPO_URL="${lines[1]}"
+  METADATA_PATH_IN_REPO="${lines[2]}"
+  METADATA_BRANCH="${lines[3]}"
+  METADATA_COMMIT_HASH="${lines[4]}"
+
+  if [[ "$METADATA_VERSION" != "1" ]]; then
+    echo "[oogit] Error: Unsupported file version: $METADATA_VERSION" >&2
+    exit 1
+  fi
+}
+
 ensure_dirs() {
   local ooxml_file="$1"
 
@@ -433,26 +457,11 @@ commit_command() {
     echo "[oogit] $ooxml_file not found. Please run checkout command first." >&2
     exit 1
   fi
-  if [[ ! -f "$META_FILE" ]]; then
-    echo "[oogit] $META_FILE not found. Please run init or checkout command first." >&2
-    exit 1
-  fi
-
-  local lines=()
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    lines+=("$line")
-  done < "$META_FILE"
-
-  local file_version="${lines[0]}"
-  local repo_url="${lines[1]}"
-  local path_in_repo="${lines[2]}"
-  local branch="${lines[3]}"
-  local commit_hash="${lines[4]}"
-
-  if [[ "$file_version" != "1" ]]; then
-    echo "[oogit] Error: Unsupported file version: $file_version" >&2
-    exit 1
-  fi
+  load_metadata
+  local repo_url="$METADATA_REPO_URL"
+  local path_in_repo="$METADATA_PATH_IN_REPO"
+  local branch="$METADATA_BRANCH"
+  local commit_hash="$METADATA_COMMIT_HASH"
 
   local init_args=()
 
@@ -529,26 +538,11 @@ update_command() {
     echo "[oogit] $ooxml_file not found. Please run checkout command first." >&2
     exit 1
   fi
-  if [[ ! -f "$META_FILE" ]]; then
-    echo "[oogit] $META_FILE not found. Please run init or checkout command first." >&2
-    exit 1
-  fi
-
-  local lines=()
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    lines+=("$line")
-  done < "$META_FILE"
-
-  local file_version="${lines[0]}"
-  local repo_url="${lines[1]}"
-  local path_in_repo="${lines[2]}"
-  local branch="${lines[3]}"
-  local commit_hash="${lines[4]}"
-
-  if [[ "$file_version" != "1" ]]; then
-    echo "[oogit] Error: Unsupported file version: $file_version" >&2
-    exit 1
-  fi
+  load_metadata
+  local repo_url="$METADATA_REPO_URL"
+  local path_in_repo="$METADATA_PATH_IN_REPO"
+  local branch="$METADATA_BRANCH"
+  local commit_hash="$METADATA_COMMIT_HASH"
 
   rm -rf "$REPO_DIR"
   if [[ -n "$branch" ]]; then
@@ -639,26 +633,11 @@ reset_command() {
     echo "[oogit] $ooxml_file not found. Please run checkout command first." >&2
     exit 1
   fi
-  if [[ ! -f "$META_FILE" ]]; then
-    echo "[oogit] $META_FILE not found. Please run init or checkout command first." >&2
-    exit 1
-  fi
-
-  local lines=()
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    lines+=("$line")
-  done < "$META_FILE"
-
-  local file_version="${lines[0]}"
-  local repo_url="${lines[1]}"
-  local path_in_repo="${lines[2]}"
-  local branch="${lines[3]}"
-  local commit_hash="${lines[4]}"
-
-  if [[ "$file_version" != "1" ]]; then
-    echo "[oogit] Error: Unsupported file version: $file_version" >&2
-    exit 1
-  fi
+  load_metadata
+  local repo_url="$METADATA_REPO_URL"
+  local path_in_repo="$METADATA_PATH_IN_REPO"
+  local branch="$METADATA_BRANCH"
+  local commit_hash="$METADATA_COMMIT_HASH"
 
   rm -rf "$REPO_DIR"
   my_git init "$REPO_DIR"
