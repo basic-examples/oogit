@@ -2,14 +2,18 @@
 
 set -euo pipefail
 
+die() {
+  echo "[oogit] $*" >&2
+  exit 1
+}
+
 NAME=$0
 if [[ -n "${NAME_OVERRIDE:-}" ]]; then
   NAME="$NAME_OVERRIDE"
 fi
 
 if ! command -v git >/dev/null 2>&1; then
-  echo "[oogit] git not found" >&2
-  exit 1
+  die "git not found"
 fi
 
 
@@ -24,17 +28,17 @@ silent_pushd() {
   local dir="$1"
 
   if [[ "$VERBOSE" == "true" ]]; then
-    pushd "$dir"
+    pushd "$dir" || die "pushd $dir failed"
   else
-    pushd "$dir" > /dev/null
+    pushd "$dir" > /dev/null || die "pushd $dir failed"
   fi
 }
 
 silent_popd() {
   if [[ "$VERBOSE" == "true" ]]; then
-    popd
+    popd || die "popd failed"
   else
-    popd > /dev/null
+    popd > /dev/null || die "popd failed"
   fi
 }
 
@@ -120,10 +124,10 @@ zip_dir() {
   local out_file="$2"
   if command -v zip >/dev/null 2>&1; then
     local out_file_absolute=$(cd "$(dirname "$out_file")" && pwd)/$(basename "$out_file")
-    (cd "$src_dir" && zip -qr "$out_file_absolute" .)
+    (cd "$src_dir" && zip -qr "$out_file_absolute" .) || die "zip failed"
   elif command -v powershell.exe >/dev/null 2>&1; then
     powershell.exe -NoProfile -Command \
-      "Compress-Archive -Path '$(convert_path_windows "$src_dir")\\*' -DestinationPath '$(convert_path_windows "$out_file")' -Force"
+      "Compress-Archive -Path '$(convert_path_windows "$src_dir")\\*' -DestinationPath '$(convert_path_windows "$out_file")' -Force" || die "zip failed"
   else
     echo "[oogit] No zip or PowerShell found" >&2
     exit 1
@@ -134,10 +138,10 @@ unzip_file() {
   local zip_file="$1"
   local out_dir="$2"
   if command -v unzip >/dev/null 2>&1; then
-    unzip -q "$zip_file" -d "$out_dir"
+    unzip -q "$zip_file" -d "$out_dir" || die "unzip failed"
   elif command -v powershell.exe >/dev/null 2>&1; then
     powershell.exe -NoProfile -Command \
-      "Expand-Archive -Path '$(convert_path_windows "$zip_file")' -DestinationPath '$(convert_path_windows "$out_dir")' -Force"
+      "Expand-Archive -Path '$(convert_path_windows "$zip_file")' -DestinationPath '$(convert_path_windows "$out_dir")' -Force" || die "unzip failed"
   else
     echo "[oogit] No unzip or PowerShell found" >&2
     exit 1
@@ -150,8 +154,8 @@ fetch_and_reset() {
   local commit_hash="$2"
 
   silent_pushd "$repo_dir"
-  silent_git fetch
-  silent_git reset --hard "$commit_hash"
+  silent_git fetch || die "git fetch failed"
+  silent_git reset --hard "$commit_hash" || die "git reset failed"
   silent_popd
 }
 
@@ -161,8 +165,8 @@ unzip_file_to_repo() {
   local ooxml_file="$3"
 
   rm -rf "$repo_dir$path_in_repo"
-  mkdir -p "$repo_dir$path_in_repo"
-  unzip_file "$ooxml_file" "$repo_dir$path_in_repo"
+  mkdir -p "$repo_dir$path_in_repo" || die "mkdir failed"
+  unzip_file "$ooxml_file" "$repo_dir$path_in_repo" || die "unzip_file failed"
 }
 
 my_git_commit() {
@@ -171,12 +175,12 @@ my_git_commit() {
   local commit_message="$3"
 
   silent_pushd "$repo_dir$path_in_repo"
-  silent_git add .
+  silent_git add . || die "git add failed"
   if ! silent_git diff-index --quiet HEAD; then
     if [[ -n "$commit_message" ]]; then
-      silent_git commit -m "$commit_message"
+      silent_git commit -m "$commit_message" || die "git commit failed"
     else
-      git commit
+      git commit || die "git commit failed"
     fi
   fi
   silent_popd
@@ -187,7 +191,7 @@ my_git_commit_intermediate() {
   local path_in_repo="$2"
 
   silent_pushd "$repo_dir$path_in_repo"
-  silent_git add .
+  silent_git add . || die "git add failed"
   silent_popd
   silent_pushd "$repo_dir"
   TMP_INDEX=0
@@ -200,9 +204,9 @@ my_git_commit_intermediate() {
     fi
   done < <(git diff --cached --name-status -z)
   if [[ "$TMP_INDEX" -gt 0 ]]; then
-    silent_git add .
+    silent_git add . || die "git add failed"
     if ! silent_git diff-index --quiet HEAD; then
-      silent_git commit -m "[oogit-intermediate-commit]"
+      silent_git commit -m "[oogit-intermediate-commit]" || die "git commit failed"
     fi
   fi
   silent_popd
@@ -212,7 +216,7 @@ git_pull() {
   local repo_dir="$1"
 
   silent_pushd "$REPO_DIR"
-  silent_git pull --no-rebase
+  silent_git pull --no-rebase || die "git pull failed"
   silent_popd
 }
 
@@ -227,7 +231,7 @@ git_push() {
     echo "[oogit] Error: No remote found" >&2
     exit 1
   fi
-  silent_git push --set-upstream "$remote_name" "$branch"
+  silent_git push --set-upstream "$remote_name" "$branch" || die "git push failed"
   silent_popd
 }
 
@@ -235,7 +239,7 @@ git_get_commit_hash() {
   local repo_dir="$1"
 
   silent_pushd "$repo_dir"
-  git rev-parse HEAD
+  git rev-parse HEAD || die "git rev-parse failed"
   silent_popd
 }
 
@@ -245,8 +249,8 @@ zip_dir_from_repo() {
   local ooxml_file="$3"
 
   mkdir -p "$TEMP_DIR"
-  zip_dir "$repo_dir$path_in_repo" "$TEMP_DIR/output.zip"
-  mv "$TEMP_DIR/output.zip" "$ooxml_file"
+  zip_dir "$repo_dir$path_in_repo" "$TEMP_DIR/output.zip" || die "zip_dir failed"
+  mv "$TEMP_DIR/output.zip" "$ooxml_file" || die "mv failed"
 }
 
 write_metadata() {
@@ -255,7 +259,7 @@ write_metadata() {
   local branch="$3"
   local commit_hash="$4"
 
-  cat > "$META_FILE" <<EOF
+  cat > "$META_FILE" <<EOF || die "write metadata failed"
 1
 $repo_url
 $path_in_repo
@@ -367,22 +371,22 @@ init_command() {
   if [[ -n "$branch" ]]; then
     if ! silent_git clone --branch "$branch" --single-branch -- "$repo_url" "$REPO_DIR" 2>/dev/null; then
       echo "[oogit] Branch '$branch' not found, creating new branch"
-      silent_git clone --single-branch --depth 1 -- "$repo_url" "$REPO_DIR"
+      silent_git clone --single-branch --depth 1 -- "$repo_url" "$REPO_DIR" || die "git clone failed"
       silent_pushd "$REPO_DIR"
-      silent_git checkout --orphan "$branch"
-      silent_git reset --hard
+      silent_git checkout --orphan "$branch" || die "git checkout failed"
+      silent_git reset --hard || die "git reset failed"
       silent_popd
     fi
   else
-    silent_git clone --single-branch -- "$repo_url" "$REPO_DIR"
+    silent_git clone --single-branch -- "$repo_url" "$REPO_DIR" || die "git clone failed"
     silent_pushd "$REPO_DIR"
-    branch=$(git branch --show-current)
+    branch=$(git branch --show-current) || die "git branch failed"
     silent_popd
   fi
 
   if [[ -n "$expected_commit_hash" ]]; then
     silent_pushd "$REPO_DIR"
-    local current_commit_hash=$(git rev-parse HEAD)
+    local current_commit_hash=$(git rev-parse HEAD) || die "git rev-parse failed"
     silent_popd
     if [[ "$current_commit_hash" != "$expected_commit_hash" ]]; then
       echo "[oogit] Error: Commit hash mismatch" >&2
@@ -477,11 +481,11 @@ checkout_command() {
   fi
 
   if [[ -n "$branch" ]]; then
-    silent_git clone --branch "$branch" --single-branch -- "$repo_url" "$REPO_DIR"
+    silent_git clone --branch "$branch" --single-branch -- "$repo_url" "$REPO_DIR" || die "git clone failed"
   else
-    silent_git clone --single-branch -- "$repo_url" "$REPO_DIR"
+    silent_git clone --single-branch -- "$repo_url" "$REPO_DIR" || die "git clone failed"
     silent_pushd "$REPO_DIR"
-    branch=$(git branch --show-current)
+    branch=$(git branch --show-current) || die "git branch failed"
     silent_popd
   fi
 
@@ -696,9 +700,9 @@ reset_command() {
   local commit_hash="$METADATA_COMMIT_HASH"
 
   silent_pushd "$REPO_DIR"
-  silent_git fetch
-  silent_git reset --hard "$tag_or_commit"
-  local new_commit_hash=$(git rev-parse HEAD)
+  silent_git fetch || die "git fetch failed"
+  silent_git reset --hard "$tag_or_commit" || die "git reset failed"
+  local new_commit_hash=$(git rev-parse HEAD) || die "git rev-parse failed"
   silent_popd
 
   zip_dir_from_repo "$REPO_DIR" "$path_in_repo" "$ooxml_file"
