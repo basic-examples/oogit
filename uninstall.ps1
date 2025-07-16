@@ -22,6 +22,11 @@ foreach ($ext in $supportedExtensions) {
     Set-ItemProperty -Path $openCommandPath -Name "(default)" -Value $originalCommand
     Remove-Item -Force $assocBackupPath
   }
+
+  $contextMenuPath = "HKLM:\SOFTWARE\Classes\$assoc\shell\oogit"
+  if (Test-Path $contextMenuPath) {
+    Remove-Item -Path $contextMenuPath -Recurse -Force
+  }
 }
 
 $envPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
