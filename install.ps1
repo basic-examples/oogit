@@ -35,12 +35,21 @@ foreach ($ext in $supportedExtensions) {
   (Get-ItemProperty -Path $openCommandPath)."(default)" | Out-File -Encoding UTF8 -FilePath $assocBackupPath
   Set-ItemProperty -Path $openCommandPath -Name "(default)" -Value "\"$batPath\" open $ext \"%1\""
 
-  $contextMenuPath = "HKLM:\SOFTWARE\Classes\$assoc\shell\oogit"
-  New-Item -Path $contextMenuPath -Force | Out-Null
-  Set-ItemProperty -Path $contextMenuPath -Name "MUIVerb" -Value "oogit..."
-  $commandPath = "$contextMenuPath\command"
-  New-Item -Path $commandPath -Force | Out-Null
-  Set-ItemProperty -Path $commandPath -Name "(default)" -Value "powershell -ExecutionPolicy Bypass -File \"$guiDestination\" \"%1\""
+  $contextMenuPathPrefix = "HKLM:\SOFTWARE\Classes\$assoc\shell\oogit-"
+
+  $contextMenuPathCommit = "${contextMenuPathPrefix}commit"
+  New-Item -Path $contextMenuPathCommit -Force | Out-Null
+  Set-ItemProperty -Path $contextMenuPathCommit -Name "(default)" -Value "oogit commit"
+  $commandPathCommit = "${contextMenuPathCommit}\command"
+  New-Item -Path $commandPathCommit -Force | Out-Null
+  Set-ItemProperty -Path $commandPathCommit -Name "(default)" -Value "powershell -ExecutionPolicy Bypass -File \"$guiDestination\" commit $ext \"%1\""
+
+  $contextMenuPathUpdate = "${contextMenuPathPrefix}update"
+  New-Item -Path $contextMenuPathUpdate -Force | Out-Null
+  Set-ItemProperty -Path $contextMenuPathUpdate -Name "(default)" -Value "oogit update"
+  $commandPathUpdate = "${contextMenuPathUpdate}\command"
+  New-Item -Path $commandPathUpdate -Force | Out-Null
+  Set-ItemProperty -Path $commandPathUpdate -Name "(default)" -Value "powershell -ExecutionPolicy Bypass -File \"$guiDestination\" update $ext \"%1\""
 }
 
 Write-Host "Installation complete. You need to log out and log in again or restart explorer.exe for PATH to take effect."
