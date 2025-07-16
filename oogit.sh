@@ -196,7 +196,7 @@ my_git_commit_intermediate() {
     IFS= read -r -d '' file || break
     if [[ "$status" == A || "$status" == M || "$status" == R ]] && [[ -f "$file" ]]; then
       mv "$file" "${path_in_repo#/}/oogit-intermediate-name-$TMP_INDEX"
-      ((TMP_INDEX++))
+      ((TMP_INDEX++)) || true
     fi
   done < <(git diff --cached --name-status -z)
   if [[ "$TMP_INDEX" -gt 0 ]]; then
@@ -706,7 +706,7 @@ reset_command() {
 }
 
 version_command() {
-  echo "oogit 0.2.1"
+  echo "oogit 0.2.2"
 }
 
 help_command() {

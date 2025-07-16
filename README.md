@@ -97,6 +97,7 @@ oogit reset [options] <ooxml-file> [tag-or-commit]
 - `0.1.3`: Updated outdated document
 - `0.2.0`: Added basic rename handling, but very poor
 - `0.2.1`: Added missing license field in `package.json`
+- `0.2.2`: Fixed bug on status `R` and `(( COUNTER++ ))`
 
 ## License
 
