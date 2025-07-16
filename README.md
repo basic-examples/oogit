@@ -8,6 +8,8 @@ and reassembles the file when you are done.
 
 Works on both POSIX and Windows systems (via Git Bash).
 
+Please note that the `main` branch is used for ongoing development and may contain unreleased features or bugs.
+
 ## Installation
 
 ```sh
