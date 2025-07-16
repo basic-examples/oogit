@@ -4,7 +4,7 @@ set -euo pipefail
 
 TMP_DIR="tmp"
 rm -rf "$TMP_DIR"
-trap 'rm -rf "$TMP_DIR"' EXIT
+# trap 'rm -rf "$TMP_DIR"' EXIT
 
 oogit() {
   powershell -ExecutionPolicy Bypass -File oogit.ps1 "$@"
@@ -18,12 +18,12 @@ git init --bare "$REPO" >/dev/null
 # may create parent directory if it does not exist
 convert_path_windows() {
   if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
-    if [[ -d "$1" ]]; then
-      (cd "$1" && pwd -W | tr '/' '\\')
+    if [[ -d "$(dirname "$1")" ]]; then
+      (cd "$(dirname "$1")" && (pwd -W | tr -d '[:space:]' && echo "/$(basename "$1")") | tr '/' '\\')
     else
-      mkdir -p "$1"
-      (cd "$1" && pwd -W | tr '/' '\\')
-      rm -rf "$1"
+      mkdir -p "$(dirname "$1")"
+      (cd "$(dirname "$1")" && (pwd -W | tr -d '[:space:]' && echo "/$(basename "$1")") | tr '/' '\\')
+      rm -rf "$(dirname "$1")"
     fi
   else
     echo "$1"
@@ -61,7 +61,8 @@ prepare_doc() {
 # init command
 
 prepare_doc "$TMP_DIR/root.docx" "hello"
-oogit init -m "initial" "$TMP_DIR/root.docx" "$REPO" main
+echo "test: $(convert_path_windows "$TMP_DIR/root.docx")"
+oogit init -m "initial" "$(convert_path_windows "$TMP_DIR/root.docx")" "$(convert_path_windows "$REPO")" main
 
 git clone --branch main "$REPO" "$TMP_DIR/tmp-repo"
 echo "hello" | diff - "$TMP_DIR/tmp-repo/root/content.txt"
@@ -72,13 +73,13 @@ rm -rf "$TMP_DIR/tmp-repo"
 cat <<EOF | diff - "$TMP_DIR/root.docx.oogit/metadata"
 1
 $REPO
-/root
+\root
 main
 $COMMIT_HASH1
 EOF
 
 prepare_doc "$TMP_DIR/other.docx" "hello"
-oogit init -m "init other" "$TMP_DIR/other.docx" "$REPO" main other
+oogit init -m "init other" "$(convert_path_windows "$TMP_DIR/other.docx")" "$(convert_path_windows "$REPO")" main other
 
 git clone --branch main "$REPO" "$TMP_DIR/tmp-repo"
 echo "hello" | diff - "$TMP_DIR/tmp-repo/root/content.txt"
@@ -90,26 +91,26 @@ rm -rf "$TMP_DIR/tmp-repo"
 cat <<EOF | diff - "$TMP_DIR/root.docx.oogit/metadata"
 1
 $REPO
-/root
+\root
 main
 $COMMIT_HASH1
 EOF
 cat <<EOF | diff - "$TMP_DIR/other.docx.oogit/metadata"
 1
 $REPO
-/other
+\other
 main
 $COMMIT_HASH2
 EOF
 
 prepare_doc "$TMP_DIR/other.docx" "bye"
-! oogit init -m "overwrite" "$TMP_DIR/other.docx" "$REPO" main 2>"$TMP_DIR/error.txt"
+! oogit init -m "overwrite" "$(convert_path_windows "$TMP_DIR/other.docx")" "$(convert_path_windows "$REPO")" main 2>"$TMP_DIR/error.txt"
 
 diff - "$TMP_DIR/error.txt" <<EOF
 [oogit] tmp/other.docx.oogit/metadata already exists. Please run with --force option to overwrite.
 EOF
 
-oogit init -m "force overwrite" --force "$TMP_DIR/other.docx" "$REPO" main other
+oogit init -m "force overwrite" --force "$(convert_path_windows "$TMP_DIR/other.docx")" "$(convert_path_windows "$REPO")" main other
 
 git clone --branch main "$REPO" "$TMP_DIR/tmp-repo"
 pushd "$TMP_DIR/tmp-repo" >/dev/null
@@ -119,20 +120,20 @@ rm -rf "$TMP_DIR/tmp-repo"
 cat <<EOF | diff - "$TMP_DIR/root.docx.oogit/metadata"
 1
 $REPO
-/root
+\root
 main
 $COMMIT_HASH1
 EOF
 cat <<EOF | diff - "$TMP_DIR/other.docx.oogit/metadata"
 1
 $REPO
-/other
+\other
 main
 $COMMIT_HASH2
 EOF
 
 prepare_doc "$TMP_DIR/another.docx" "another"
-oogit init -m "init another" "$TMP_DIR/another.docx" "$REPO" main another
+oogit init -m "init another" "$(convert_path_windows "$TMP_DIR/another.docx")" "$(convert_path_windows "$REPO")" main another
 
 git clone --branch main "$REPO" "$TMP_DIR/tmp-repo"
 echo "hello" | diff - "$TMP_DIR/tmp-repo/root/content.txt"
@@ -145,27 +146,27 @@ rm -rf "$TMP_DIR/tmp-repo"
 cat <<EOF | diff - "$TMP_DIR/root.docx.oogit/metadata"
 1
 $REPO
-/root
+\root
 main
 $COMMIT_HASH1
 EOF
 cat <<EOF | diff - "$TMP_DIR/other.docx.oogit/metadata"
 1
 $REPO
-/other
+\other
 main
 $COMMIT_HASH2
 EOF
 cat <<EOF | diff - "$TMP_DIR/another.docx.oogit/metadata"
 1
 $REPO
-/another
+\another
 main
 $COMMIT_HASH3
 EOF
 
 prepare_doc "$TMP_DIR/branch.docx" "isolated"
-oogit init -m "init branch" "$TMP_DIR/branch.docx" "$REPO" branch
+oogit init -m "init branch" "$(convert_path_windows "$TMP_DIR/branch.docx")" "$(convert_path_windows "$REPO")" branch
 
 git clone --branch branch "$REPO" "$TMP_DIR/tmp-repo"
 echo "isolated" | diff - "$TMP_DIR/tmp-repo/root/content.txt"
@@ -176,7 +177,7 @@ rm -rf "$TMP_DIR/tmp-repo"
 
 # checkout command
 
-oogit checkout "$TMP_DIR/checkout.docx" "$REPO" main
+oogit checkout "$(convert_path_windows "$TMP_DIR/checkout.docx")" "$(convert_path_windows "$REPO")" main
 
 unzip_file "$TMP_DIR/checkout.docx" "$DOC_DIR"
 echo "hello" | diff - "$DOC_DIR/content.txt"
@@ -184,14 +185,14 @@ rm -rf "$DOC_DIR"
 cat <<EOF | diff - "$TMP_DIR/checkout.docx.oogit/metadata"
 1
 $REPO
-/root
+\root
 main
 $COMMIT_HASH3
 EOF
 
 # update command
 
-oogit update -m "not needed" "$TMP_DIR/root.docx"
+oogit update -m "not needed" "$(convert_path_windows "$TMP_DIR/root.docx")"
 
 unzip_file "$TMP_DIR/checkout.docx" "$DOC_DIR"
 
@@ -200,7 +201,7 @@ rm -rf "$DOC_DIR"
 cat <<EOF | diff - "$TMP_DIR/root.docx.oogit/metadata"
 1
 $REPO
-/root
+\root
 main
 $COMMIT_HASH3
 EOF
@@ -208,10 +209,10 @@ EOF
 # commit command
 
 prepare_doc "$TMP_DIR/commit.docx" "original"
-oogit init -m "init commit" --force "$TMP_DIR/commit.docx" "$REPO" main
+oogit init -m "init commit" --force $(convert_path_windows "$TMP_DIR/commit.docx") "$(convert_path_windows "$REPO")" main
 prepare_doc "$TMP_DIR/commit.docx" "updated"
-oogit commit -m "update commit" "$TMP_DIR/commit.docx"
-oogit update -m "not needed" "$TMP_DIR/root.docx"
+oogit commit -m "update commit" $(convert_path_windows "$TMP_DIR/commit.docx")
+oogit update -m "not needed" "$(convert_path_windows "$TMP_DIR/root.docx")"
 
 git clone --branch main "$REPO" "$TMP_DIR/tmp-repo"
 echo "updated" | diff - "$TMP_DIR/tmp-repo/root/content.txt"
@@ -225,14 +226,14 @@ rm -rf "$DOC_DIR"
 cat <<EOF | diff - "$TMP_DIR/commit.docx.oogit/metadata"
 1
 $REPO
-/root
+\root
 main
 $COMMIT_HASH4
 EOF
 
 # reset command
 
-oogit reset "$TMP_DIR/root.docx" "$COMMIT_HASH1"
+oogit reset "$(convert_path_windows "$TMP_DIR/root.docx")" "$COMMIT_HASH1"
 
 unzip_file "$TMP_DIR/checkout.docx" "$DOC_DIR"
 
@@ -241,7 +242,7 @@ rm -rf "$DOC_DIR"
 cat <<EOF | diff - "$TMP_DIR/root.docx.oogit/metadata"
 1
 $REPO
-/root
+\root
 main
 $COMMIT_HASH1
 EOF

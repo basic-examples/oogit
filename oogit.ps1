@@ -16,11 +16,15 @@ if ($env:V -eq '1' -or $env:V -eq 'true' -or $env:VERBOSE -eq '1' -or $env:VERBO
 }
 
 function SilentGit {
-  param([string[]]$Args)
+  param(
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]
+    $GitArgs
+  )
   if ($VerboseEnabled) {
-    & git @Args
+    & git @GitArgs
   } else {
-    & git @Args > $null 2>&1
+    & git @GitArgs > $null 2>&1
   }
 }
 
@@ -44,9 +48,9 @@ function Load-Metadata {
 function Ensure-Dirs {
   param($ooxmlFile)
   $global:META_DIR = "$ooxmlFile.oogit"
-  $global:META_FILE = "$META_DIR/metadata"
-  $global:REPO_DIR = "$META_DIR/repo"
-  $global:TEMP_DIR = "$META_DIR/tmp"
+  $global:META_FILE = "$META_DIR\metadata"
+  $global:REPO_DIR = "$META_DIR\repo"
+  $global:TEMP_DIR = "$META_DIR\tmp"
   Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $TEMP_DIR
   if (-not (Test-Path $META_DIR)) {
     Write-Error "[oogit] Error: $META_DIR does not exist"
@@ -57,9 +61,9 @@ function Ensure-Dirs {
 function Setup-Dirs {
   param($ooxmlFile)
   $global:META_DIR = "$ooxmlFile.oogit"
-  $global:META_FILE = "$META_DIR/metadata"
-  $global:REPO_DIR = "$META_DIR/repo"
-  $global:TEMP_DIR = "$META_DIR/tmp"
+  $global:META_FILE = "$META_DIR\metadata"
+  $global:REPO_DIR = "$META_DIR\repo"
+  $global:TEMP_DIR = "$META_DIR\tmp"
   New-Item -ItemType Directory -Force -Path $META_DIR | Out-Null
   Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $TEMP_DIR
 }
@@ -123,7 +127,10 @@ function My-Git-Commit-Intermediate {
     $status = $parts[$i]
     $file = $parts[$i+1]
     if (($status -match '^[AMR]') -and (Test-Path $file)) {
-      Move-Item $file "${pathInRepo.TrimStart('/')}/oogit-intermediate-name-$tmpIndex" -Force
+      Write-Host "${pathInRepo}"
+      Write-Host "$($pathInRepo.Substring(1))"
+      Write-Host -- Move-Item $file "$($pathInRepo.Substring(1))\oogit-intermediate-name-$tmpIndex" -Force
+      Move-Item $file "$($pathInRepo.Substring(1))\oogit-intermediate-name-$tmpIndex" -Force
       $tmpIndex++
     }
   }
@@ -163,8 +170,8 @@ function Git-Get-Commit-Hash {
 function Zip-Dir-From-Repo {
   param($repoDir,$pathInRepo,$ooxmlFile)
   New-Item -ItemType Directory -Force -Path $TEMP_DIR | Out-Null
-  Zip-Dir "$repoDir$pathInRepo" "$TEMP_DIR/output.zip"
-  Move-Item -Force "$TEMP_DIR/output.zip" $ooxmlFile
+  Zip-Dir "$repoDir$pathInRepo" "$TEMP_DIR\output.zip"
+  Move-Item -Force "$TEMP_DIR\output.zip" $ooxmlFile
 }
 
 function Write-Metadata {
@@ -177,36 +184,89 @@ function Init-Command {
   $ooxmlFile=""
   $repoUrl=""
   $branch=""
-  $pathInRepo="/root"
+  $pathInRepo="\root"
   $commitMessage=""
   $expectedCommitHash=""
   $force=$false
   $args=@()
   $parsing=$true
-  while($ArgList.Length -gt 0){
-    $arg=$ArgList[0]; $ArgList=$ArgList[1..($ArgList.Length-1)]
+  while($ArgList.Length -gt 0) {
+    $arg=$ArgList[0]
+    if ($ArgList.Length -gt 1) {
+      $ArgList = $ArgList[1..($ArgList.Length - 1)]
+    } else {
+      $ArgList = @()
+    }
     if($parsing){
       switch($arg){
-        '--' { $parsing = $false }
-        '-m' | '--message' {
+        '--' {
+          $parsing = $false
+          break
+        }
+        '-m' {
           if($ArgList.Length -gt 0 -and $ArgList[0] -notmatch '^-'){
             $commitMessage = $ArgList[0]
-            $ArgList = $ArgList[1..($ArgList.Length-1)]
+            if ($ArgList.Length -gt 1) {
+              $ArgList = $ArgList[1..($ArgList.Length - 1)]
+            } else {
+              $ArgList = @()
+            }
           } else {
             Write-Error "[oogit] Error: -m/--message requires a value"
             exit 1
           }
+          break
         }
-        '-c' | '--commit-hash' {
+        '--message' {
+          if($ArgList.Length -gt 0 -and $ArgList[0] -notmatch '^-'){
+            $commitMessage = $ArgList[0]
+            if ($ArgList.Length -gt 1) {
+              $ArgList = $ArgList[1..($ArgList.Length - 1)]
+            } else {
+              $ArgList = @()
+            }
+          } else {
+            Write-Error "[oogit] Error: -m/--message requires a value"
+            exit 1
+          }
+          break
+        }
+        '-c' {
           if($ArgList.Length -gt 0 -and $ArgList[0] -notmatch '^-'){
             $expectedCommitHash = $ArgList[0]
-            $ArgList = $ArgList[1..($ArgList.Length-1)]
+            if ($ArgList.Length -gt 1) {
+              $ArgList = $ArgList[1..($ArgList.Length - 1)]
+            } else {
+              $ArgList = @()
+            }
           } else {
             Write-Error "[oogit] Error: -c/--commit-hash requires a value"
             exit 1
           }
+          break
         }
-        '-f' | '--force' { $force = $true }
+        '--commit-hash' {
+          if($ArgList.Length -gt 0 -and $ArgList[0] -notmatch '^-'){
+            $expectedCommitHash = $ArgList[0]
+            if ($ArgList.Length -gt 1) {
+              $ArgList = $ArgList[1..($ArgList.Length - 1)]
+            } else {
+              $ArgList = @()
+            }
+          } else {
+            Write-Error "[oogit] Error: -c/--commit-hash requires a value"
+            exit 1
+          }
+          break
+        }
+        '-f' {
+          $force = $true
+          break
+        }
+        '--force' {
+          $force = $true
+          break
+        }
         default {
           if($arg -like '-*'){
             Write-Error "[oogit] Error: Unknown option $arg"
@@ -221,11 +281,12 @@ function Init-Command {
     }
   }
   if($args.Count -lt 2){ Write-Error "[oogit] Error: init requires at least ooxml-file and git-repo arguments"; exit 1 }
-  $ooxmlFile=$args[0]; $repoUrl=$args[1]
+  $ooxmlFile=$args[0]
+  $repoUrl=$args[1]
   if($args.Count -ge 3){ $branch=$args[2] }
   if($args.Count -ge 4){ $pathInRepo=$args[3] }
-  if($pathInRepo[0] -ne '/'){ $pathInRepo="/$pathInRepo" }
-  if($pathInRepo -eq '/'){ Write-Error "[oogit] Error: path_in_repo cannot be /"; exit 1 }
+  if($pathInRepo[0] -ne '\'){ $pathInRepo="\$pathInRepo" }
+  if($pathInRepo -eq '\'){ Write-Error "[oogit] Error: path_in_repo cannot be \"; exit 1 }
   Setup-Dirs $ooxmlFile
   if(-not $force){
     if(Test-Path $META_FILE){ Write-Error "[oogit] $META_FILE already exists. Please run with --force option to overwrite."; exit 1 }
@@ -235,6 +296,7 @@ function Init-Command {
   if($branch){
     try { SilentGit clone --branch $branch --single-branch -- $repoUrl $REPO_DIR } catch {
       Write-Host "[oogit] Branch '$branch' not found, creating new branch"
+      Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $REPO_DIR
       SilentGit clone --single-branch --depth 1 -- $repoUrl $REPO_DIR
       Push-Location $REPO_DIR
       SilentGit checkout --orphan $branch
@@ -264,14 +326,30 @@ function Init-Command {
 
 function Checkout-Command {
   param([string[]]$ArgList)
-  $ooxmlFile=""; $repoUrl=""; $branch=""; $pathInRepo="/root"; $force=$false
+  $ooxmlFile=""; $repoUrl=""; $branch=""; $pathInRepo="\root"; $force=$false
   $args=@(); $parsing=$true
   while($ArgList.Length -gt 0){
-    $arg=$ArgList[0]; $ArgList=$ArgList[1..($ArgList.Length-1)]
+    $arg=$ArgList[0]
+    if ($ArgList.Length -gt 1) {
+      $ArgList = $ArgList[1..($ArgList.Length - 1)]
+    } else {
+      $ArgList = @()
+    }
+
     if($parsing){
       switch($arg){
-        '--'{ $parsing=$false }
-        '-f'| '--force'{ $force=$true }
+        '--' {
+          $parsing = $false
+          break
+        }
+        '-f' {
+          $force = $true
+          break
+        }
+        '--force' {
+          $force = $true
+          break
+        }
         default{ if($arg -like '-*'){ Write-Error "[oogit] Error: Unknown option $arg"; exit 1 } $parsing=$false; $args+=$arg }
       }
     } else { $args+=$arg }
@@ -280,14 +358,21 @@ function Checkout-Command {
   $ooxmlFile=$args[0]; $repoUrl=$args[1]
   if($args.Count -ge 3){ $branch=$args[2] }
   if($args.Count -ge 4){ $pathInRepo=$args[3] }
-  if($pathInRepo[0] -ne '/'){ $pathInRepo="/$pathInRepo" }
-  if($pathInRepo -eq '/'){ Write-Error "[oogit] Error: path_in_repo cannot be /"; exit 1 }
+  if($pathInRepo[0] -ne '\'){ $pathInRepo="\$pathInRepo" }
+  if($pathInRepo -eq '\'){ Write-Error "[oogit] Error: path_in_repo cannot be \"; exit 1 }
   Setup-Dirs $ooxmlFile
   if(-not $force){
     if(Test-Path $ooxmlFile){ Write-Error "[oogit] $ooxmlFile already exists. Please run with --force option to overwrite."; exit 1 }
     if(Test-Path $META_FILE){ Write-Error "[oogit] $META_FILE already exists. Please run with --force option to overwrite."; exit 1 }
   }
-  if($branch){ SilentGit clone --branch $branch --single-branch -- $repoUrl $REPO_DIR } else { SilentGit clone --single-branch -- $repoUrl $REPO_DIR; Push-Location $REPO_DIR; $branch=git branch --show-current; Pop-Location }
+  if($branch) {
+    SilentGit clone --branch $branch --single-branch -- $repoUrl $REPO_DIR
+  } else {
+    SilentGit clone --single-branch -- $repoUrl $REPO_DIR
+    Push-Location $REPO_DIR
+    $branch = git branch --show-current
+    Pop-Location
+  }
   Zip-Dir-From-Repo $REPO_DIR $pathInRepo $ooxmlFile
   $commitHash = Git-Get-Commit-Hash $REPO_DIR
   Write-Metadata $repoUrl $pathInRepo $branch $commitHash
@@ -297,11 +382,44 @@ function Commit-Command {
   param([string[]]$ArgList)
   $ooxmlFile=""; $commitMessage=""; $args=@(); $parsing=$true
   while($ArgList.Length -gt 0){
-    $arg=$ArgList[0]; $ArgList=$ArgList[1..($ArgList.Length-1)]
+    $arg=$ArgList[0]
+    if ($ArgList.Length -gt 1) {
+      $ArgList = $ArgList[1..($ArgList.Length - 1)]
+    } else {
+      $ArgList = @()
+    }
     if($parsing){
       switch($arg){
-        '--'{ $parsing=$false }
-        '-m'| '--message'{ if($ArgList.Length -gt 0 -and $ArgList[0] -notmatch '^-'){ $commitMessage=$ArgList[0]; $ArgList=$ArgList[1..($ArgList.Length-1)] } else { Write-Error "[oogit] Error: -m/--message requires a value"; exit 1 } }
+        '--' {
+          $parsing = $false
+          break
+        }
+        '-m' {
+          if($ArgList.Length -gt 0 -and $ArgList[0] -notmatch '^-') {
+            $commitMessage=$ArgList[0]
+            if ($ArgList.Length -gt 1) {
+              $ArgList = $ArgList[1..($ArgList.Length - 1)]
+            } else {
+              $ArgList = @()
+            }
+          } else {
+            Write-Error "[oogit] Error: -m/--message requires a value"; exit 1
+          }
+          break
+        }
+        '--message' {
+          if($ArgList.Length -gt 0 -and $ArgList[0] -notmatch '^-') {
+            $commitMessage=$ArgList[0]
+            if ($ArgList.Length -gt 1) {
+              $ArgList = $ArgList[1..($ArgList.Length - 1)]
+            } else {
+              $ArgList = @()
+            }
+          } else {
+            Write-Error "[oogit] Error: -m/--message requires a value"; exit 1
+          }
+          break
+        }
         default{ if($arg -like '-*'){ Write-Error "[oogit] Error: Unknown option $arg"; exit 1 } $parsing=$false; $args+=$arg }
       }
     } else { $args+=$arg }
@@ -327,12 +445,48 @@ function Update-Command {
   param([string[]]$ArgList)
   $ooxmlFile=""; $commitMessage=""; $force=$false; $args=@(); $parsing=$true
   while($ArgList.Length -gt 0){
-    $arg=$ArgList[0]; $ArgList=$ArgList[1..($ArgList.Length-1)]
+    $arg=$ArgList[0]
+    if ($ArgList.Length -gt 1) {
+      $ArgList = $ArgList[1..($ArgList.Length - 1)]
+    } else {
+      $ArgList = @()
+    }
     if($parsing){
       switch($arg){
-        '--'{ $parsing=$false }
-        '-m'| '--message'{ if($ArgList.Length -gt 0 -and $ArgList[0] -notmatch '^-'){ $commitMessage=$ArgList[0]; $ArgList=$ArgList[1..($ArgList.Length-1)] } else { Write-Error "[oogit] Error: -m/--message requires a value"; exit 1 } }
-        '-f'| '--force'{ $force=$true }
+        '--' {
+          $parsing = $false
+          break
+        }
+        '-m' {
+          if($ArgList.Length -gt 0 -and $ArgList[0] -notmatch '^-'){
+            $commitMessage=$ArgList[0]
+            if ($ArgList.Length -gt 1) {
+              $ArgList = $ArgList[1..($ArgList.Length - 1)]
+            } else {
+              $ArgList = @()
+            }
+          } else { Write-Error "[oogit] Error: -m/--message requires a value"; exit 1 }
+          break
+        }
+        '--message' {
+          if($ArgList.Length -gt 0 -and $ArgList[0] -notmatch '^-'){
+            $commitMessage=$ArgList[0]
+            if ($ArgList.Length -gt 1) {
+              $ArgList = $ArgList[1..($ArgList.Length - 1)]
+            } else {
+              $ArgList = @()
+            }
+          } else { Write-Error "[oogit] Error: -m/--message requires a value"; exit 1 }
+          break
+        }
+        '-f' {
+          $force=$true
+          break
+        }
+        '--force' {
+          $force=$true
+          break
+        }
         default{ if($arg -like '-*'){ Write-Error "[oogit] Error: Unknown option $arg"; exit 1 } $parsing=$false; $args+=$arg }
       }
     } else { $args+=$arg }
@@ -358,10 +512,18 @@ function Reset-Command {
   param([string[]]$ArgList)
   $ooxmlFile=""; $tagOrCommit=""; $args=@(); $parsing=$true
   while($ArgList.Length -gt 0){
-    $arg=$ArgList[0]; $ArgList=$ArgList[1..($ArgList.Length-1)]
+    $arg=$ArgList[0]
+    if ($ArgList.Length -gt 1) {
+      $ArgList = $ArgList[1..($ArgList.Length - 1)]
+    } else {
+      $ArgList = @()
+    }
     if($parsing){
       switch($arg){
-        '--'{ $parsing=$false }
+        '--' {
+          $parsing = $false
+          break
+        }
         default{ if($arg -like '-*'){ Write-Error "[oogit] Error: Unknown option $arg"; exit 1 } $parsing=$false; $args+=$arg }
       }
     } else { $args+=$arg }
@@ -434,4 +596,3 @@ switch ($command) {
   '-h' { Help-Command 0 }
   default { Help-Command 1 }
 }
-
