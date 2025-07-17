@@ -13,18 +13,39 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 $VerboseEnabled = $false
 if ($env:V -eq '1' -or $env:V -eq 'true' -or $env:VERBOSE -eq '1' -or $env:VERBOSE -eq 'true') {
   $VerboseEnabled = $true
+  Set-PSDebug -Trace 1
 }
 
-function SilentGit {
+function Run-Checked-Silent {
   param(
+    [string] $Command,
     [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]]
-    $GitArgs
+    [string[]] $Args
   )
+
   if ($VerboseEnabled) {
-    & git @GitArgs
+    & $Command @Args
   } else {
-    & git @GitArgs > $null 2>&1
+    # & $Command @Args 2>&1 | Out-Null // FIXME: this is not working
+    & $Command @Args
+  }
+
+  if ($LASTEXITCODE -ne 0) {
+    throw "Command '$($Command + ' ' + ($Args -join ' '))' failed with exit code $LASTEXITCODE"
+  }
+}
+
+function Run-Checked {
+  param(
+    [string] $Command,
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]] $Args
+  )
+
+  & $Command @Args
+
+  if ($LASTEXITCODE -ne 0) {
+    throw "Command '$($Command + ' ' + ($Args -join ' '))' failed with exit code $LASTEXITCODE"
   }
 }
 
@@ -70,30 +91,23 @@ function Setup-Dirs {
 
 function Zip-Dir {
   param($srcDir,$outFile)
-  if (Get-Command zip -ErrorAction SilentlyContinue) {
-    $outAbsolute = Join-Path (Resolve-Path (Split-Path $outFile -Parent)) (Split-Path $outFile -Leaf)
-    Push-Location $srcDir
-    & zip -qr $outAbsolute .
-    Pop-Location
-  } else {
-    Compress-Archive -Path (Join-Path $srcDir '*') -DestinationPath $outFile -Force
-  }
+  Compress-Archive -Path (Join-Path $srcDir '*') -DestinationPath $TEMP_DIR/output.zip -Force
+  Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $outFile
+  Move-Item -Force $TEMP_DIR/output.zip $outFile
 }
 
 function Unzip-File {
   param($zipFile,$outDir)
-  if (Get-Command unzip -ErrorAction SilentlyContinue) {
-    & unzip -q $zipFile -d $outDir
-  } else {
-    Expand-Archive -Path $zipFile -DestinationPath $outDir -Force
-  }
+  New-Item -ItemType Directory -Force -Path $TEMP_DIR | Out-Null
+  Copy-Item -Path $zipFile -Destination $TEMP_DIR\input.zip -Force
+  Expand-Archive -Path $TEMP_DIR\input.zip -DestinationPath $outDir -Force
 }
 
 function Fetch-And-Reset {
   param($repoDir,$commitHash)
   Push-Location $repoDir
-  SilentGit fetch
-  SilentGit reset --hard $commitHash
+  Run-Checked-Silent -- git fetch
+  Run-Checked-Silent -- git reset --hard $commitHash
   Pop-Location
 }
 
@@ -105,20 +119,35 @@ function Unzip-File-To-Repo {
 }
 
 function My-Git-Commit {
-  param($repoDir,$pathInRepo,$message)
+  param($repoDir, $pathInRepo, $message)
   Push-Location "$repoDir$pathInRepo"
-  SilentGit add .
-  if (-not (git diff-index --quiet HEAD 2>$null)) {
-    if ($message) { SilentGit commit -m $message } else { git commit }
+  Run-Checked-Silent -- git add .
+
+  git rev-parse --verify HEAD >$null 2>&1
+  if ($LASTEXITCODE -eq 0) {
+    Pop-Location
+    return
+  } else {
+    git diff-index --quiet HEAD 2>$null
+    if ($LASTEXITCODE -eq 0) {
+      Pop-Location
+      return
+    }
   }
+
+  if ($message) {
+    Run-Checked-Silent -- git commit -m $message
+  } else {
+    git commit
+    if ($LASTEXITCODE -ne 0) { throw "git commit failed" }
+  }
+
   Pop-Location
 }
 
 function My-Git-Commit-Intermediate {
   param($repoDir,$pathInRepo)
-  Push-Location "$repoDir$pathInRepo"
-  SilentGit add .
-  Pop-Location
+  Run-Checked-Silent -- git -C "$repoDir$pathInRepo" add .
   Push-Location $repoDir
   $tmpIndex = 0
   $output = git diff --cached --name-status -z
@@ -127,18 +156,24 @@ function My-Git-Commit-Intermediate {
     $status = $parts[$i]
     $file = $parts[$i+1]
     if (($status -match '^[AMR]') -and (Test-Path $file)) {
-      Write-Host "${pathInRepo}"
-      Write-Host "$($pathInRepo.Substring(1))"
-      Write-Host -- Move-Item $file "$($pathInRepo.Substring(1))\oogit-intermediate-name-$tmpIndex" -Force
       Move-Item $file "$($pathInRepo.Substring(1))\oogit-intermediate-name-$tmpIndex" -Force
       $tmpIndex++
     }
   }
   if ($tmpIndex -gt 0) {
-    SilentGit add .
-    if (-not (git diff-index --quiet HEAD 2>$null)) {
-      SilentGit commit -m "[oogit-intermediate-commit]"
+    Run-Checked-Silent -- git add .
+    git rev-parse --verify HEAD >$null 2>&1
+    if ($LASTEXITCODE -eq 0) {
+      Pop-Location
+      return
+    } else {
+      git diff-index --quiet HEAD 2>$null
+      if ($LASTEXITCODE -eq 0) {
+        Pop-Location
+        return
+      }
     }
+    Run-Checked-Silent -- git commit -m "[oogit-intermediate-commit]"
   }
   Pop-Location
 }
@@ -146,7 +181,7 @@ function My-Git-Commit-Intermediate {
 function Git-Pull {
   param($repoDir)
   Push-Location $repoDir
-  SilentGit pull --no-rebase
+  Run-Checked-Silent -- git pull --no-rebase
   Pop-Location
 }
 
@@ -155,7 +190,7 @@ function Git-Push {
   Push-Location $repoDir
   $remoteName = git remote | Select-Object -First 1
   if (-not $remoteName) { Write-Error "[oogit] Error: No remote found"; exit 1 }
-  SilentGit push --set-upstream $remoteName $branch
+  Run-Checked-Silent -- git push --set-upstream $remoteName $branch
   Pop-Location
 }
 
@@ -294,17 +329,17 @@ function Init-Command {
   }
   Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $REPO_DIR
   if($branch){
-    try { SilentGit clone --branch $branch --single-branch -- $repoUrl $REPO_DIR } catch {
+    try { Run-Checked-Silent -- git clone --branch $branch --single-branch -- $repoUrl $REPO_DIR } catch {
       Write-Host "[oogit] Branch '$branch' not found, creating new branch"
       Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $REPO_DIR
-      SilentGit clone --single-branch --depth 1 -- $repoUrl $REPO_DIR
+      Run-Checked-Silent -- git clone --single-branch --depth 1 -- $repoUrl $REPO_DIR
       Push-Location $REPO_DIR
-      SilentGit checkout --orphan $branch
-      SilentGit reset --hard
+      Run-Checked-Silent -- git checkout --orphan $branch
+      Run-Checked-Silent -- git reset --hard
       Pop-Location
     }
   } else {
-    SilentGit clone --single-branch -- $repoUrl $REPO_DIR
+    Run-Checked-Silent -- git clone --single-branch -- $repoUrl $REPO_DIR
     Push-Location $REPO_DIR
     $branch = git branch --show-current
     Pop-Location
@@ -366,9 +401,9 @@ function Checkout-Command {
     if(Test-Path $META_FILE){ Write-Error "[oogit] $META_FILE already exists. Please run with --force option to overwrite."; exit 1 }
   }
   if($branch) {
-    SilentGit clone --branch $branch --single-branch -- $repoUrl $REPO_DIR
+    Run-Checked-Silent -- git clone --branch $branch --single-branch -- $repoUrl $REPO_DIR
   } else {
-    SilentGit clone --single-branch -- $repoUrl $REPO_DIR
+    Run-Checked-Silent -- git clone --single-branch -- $repoUrl $REPO_DIR
     Push-Location $REPO_DIR
     $branch = git branch --show-current
     Pop-Location
@@ -536,8 +571,8 @@ function Reset-Command {
   Load-Metadata
   $repoUrl=$METADATA_REPO_URL; $pathInRepo=$METADATA_PATH_IN_REPO; $branch=$METADATA_BRANCH; $commitHash=$METADATA_COMMIT_HASH
   Push-Location $REPO_DIR
-  SilentGit fetch
-  SilentGit reset --hard $tagOrCommit
+  Run-Checked-Silent -- git fetch
+  Run-Checked-Silent -- git reset --hard $tagOrCommit
   $newHash = git rev-parse HEAD
   Pop-Location
   Zip-Dir-From-Repo $REPO_DIR $pathInRepo $ooxmlFile

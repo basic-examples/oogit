@@ -4,7 +4,7 @@ set -euo pipefail
 
 TMP_DIR="tmp"
 rm -rf "$TMP_DIR"
-# trap 'rm -rf "$TMP_DIR"' EXIT
+trap 'rm -rf "$TMP_DIR"' EXIT
 
 oogit() {
   powershell -ExecutionPolicy Bypass -File oogit.ps1 "$@"
@@ -61,7 +61,6 @@ prepare_doc() {
 # init command
 
 prepare_doc "$TMP_DIR/root.docx" "hello"
-echo "test: $(convert_path_windows "$TMP_DIR/root.docx")"
 oogit init -m "initial" "$(convert_path_windows "$TMP_DIR/root.docx")" "$(convert_path_windows "$REPO")" main
 
 git clone --branch main "$REPO" "$TMP_DIR/tmp-repo"

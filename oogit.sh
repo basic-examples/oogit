@@ -176,7 +176,7 @@ my_git_commit() {
 
   silent_pushd "$repo_dir$path_in_repo"
   silent_git add . || die "git add failed"
-  if ! silent_git diff-index --quiet HEAD; then
+  if ! git rev-parse --verify HEAD >/dev/null 2>&1 || ! silent_git diff-index --quiet HEAD; then
     if [[ -n "$commit_message" ]]; then
       silent_git commit -m "$commit_message" || die "git commit failed"
     else
@@ -205,7 +205,7 @@ my_git_commit_intermediate() {
   done < <(git diff --cached --name-status -z)
   if [[ "$TMP_INDEX" -gt 0 ]]; then
     silent_git add . || die "git add failed"
-    if ! silent_git diff-index --quiet HEAD; then
+    if ! git rev-parse --verify HEAD >/dev/null 2>&1 || ! silent_git diff-index --quiet HEAD; then
       silent_git commit -m "[oogit-intermediate-commit]" || die "git commit failed"
     fi
   fi
