@@ -1,0 +1,11 @@
+[package]
+name = "oogit"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.98"
+clap = { version = "4.5.41", features = ["derive"] }
+git2 = "0.20.2"
+walkdir = "2.5.0"
+zip = "4.3.0"
